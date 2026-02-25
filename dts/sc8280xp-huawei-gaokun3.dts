@@ -220,37 +220,37 @@
 	};
 
 	usb0-sbu-mux {
-			compatible = "pericom,pi3usb102", "gpio-sbu-mux";
+		compatible = "pericom,pi3usb102", "gpio-sbu-mux";
 
-			select-gpios = <&tlmm 164 GPIO_ACTIVE_HIGH>;
+		select-gpios = <&tlmm 164 GPIO_ACTIVE_HIGH>;
 
-			pinctrl-names = "default";
-			pinctrl-0 = <&usb0_sbu_default>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&usb0_sbu_default>;
 
-			orientation-switch;
+		orientation-switch;
 
-			port {
-				usb0_sbu_mux: endpoint {
-					remote-endpoint = <&ucsi0_sbu>;
-				};
+		port {
+			usb0_sbu_mux: endpoint {
+				remote-endpoint = <&ucsi0_sbu>;
 			};
+		};
 	};
 
 	usb1-sbu-mux {
-			compatible = "pericom,pi3usb102", "gpio-sbu-mux";
+		compatible = "pericom,pi3usb102", "gpio-sbu-mux";
 
-			select-gpios = <&tlmm 47 GPIO_ACTIVE_HIGH>;
+		select-gpios = <&tlmm 47 GPIO_ACTIVE_HIGH>;
 
-			pinctrl-names = "default";
-			pinctrl-0 = <&usb1_sbu_default>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&usb1_sbu_default>;
 
-			orientation-switch;
+		orientation-switch;
 
-			port {
-				usb1_sbu_mux: endpoint {
-					remote-endpoint = <&ucsi1_sbu>;
-				};
+		port {
+			usb1_sbu_mux: endpoint {
+				remote-endpoint = <&ucsi1_sbu>;
 			};
+		};
 	};
 
 	wcn6855-pmu {
