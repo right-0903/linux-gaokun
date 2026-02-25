@@ -68,7 +68,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | Suspend | works | s2idle |
 | Thermal sensors | works |  |
 | Touchscreen over i2c | partial | weird behavior, I think NHLOS use this, such as BIOS configuration |
-| Touchscreen over spi | x | Anyways, it uses spi on Windows. Driver reference[1](https://github.com/MiCode/Xiaomi_Kernel_OpenSource/tree/dagu-s-oss/drivers/input/touchscreen/hxchipset), [2](https://lore.kernel.org/all/TY0PR06MB5611B4E88D79DE738241F5639E0F2@TY0PR06MB5611.apcprd06.prod.outlook.com), [3](https://lore.kernel.org/all/20231017091900.801989-1-tylor_yang@himax.corp-partner.google.com), it is a suffering to port it. |
+| Touchscreen over spi | partial | resolution is 60 \times 40 temporarily, it requires algorithm to handle raw frame data |
 | TPM | x | |
 | USB | works | |
 | USB-PD | works | fast charging(45W+) supported with UCSI EC driver |
