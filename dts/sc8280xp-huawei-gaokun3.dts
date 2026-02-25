@@ -939,13 +939,18 @@
 	status = "okay";
 };
 
+&remoteproc_slpi {
+	firmware-name = "qcom/sc8280xp/HUAWEI/gaokun3/qcslpi8280.mbn";
+	status = "okay";
+};
+
 &rxmacro {
 	status = "okay";
 };
 
 &sound {
 	compatible = "qcom,sc8280xp-sndcard";
-	model = "SC8280XP-HUAWEI-MATEBOOKEGO";
+	model = "SC8280XP-HUAWEI-GAOKUN3";
 	audio-routing = "SpkrLeft IN", "WSA_SPK1 OUT",
 			"SpkrRight IN", "WSA_SPK2 OUT",
 			"IN1_HPHL", "HPHL_OUT",
@@ -1143,6 +1148,8 @@
 		vddrfa1p8-supply = <&vreg_pmu_rfa_1p7>;
 
 		max-speed = <3200000>;
+
+		local-bd-address = [ 00 11 22 33 44 55 ];
 	};
 };
 
@@ -1311,7 +1318,7 @@
 
 &tlmm {
 
-	gpio-reserved-ranges = <70 2>, <74 6>, <83 4>, <125 2>, <128 2>, <154 4>;
+	gpio-reserved-ranges = <70 2>, <74 6>, <83 4>, <125 2>, <128 2>;
 
 	bt_default: bt-default-state {
 		hstp-bt-en-pins {
