@@ -588,6 +588,18 @@
 	status = "okay";
 };
 
+&gpi_dma0 {
+	status = "okay";
+};
+
+&gpi_dma1 {
+	status = "okay";
+};
+
+&gpi_dma2 {
+	status = "okay";
+};
+
 &gpu {
 	status = "okay";
 
@@ -1015,21 +1027,25 @@
 /* THPA, HIMX0001 */
 &spi6 {
 	pinctrl-0 = <&spi6_default>;
-    	pinctrl-names = "default";
+	pinctrl-names = "default";
 
 	status = "okay";
 
 	touchscreen@0 {
-		compatible = "himax,hx83121a-ts";
+		compatible = "himax,hx83121a";
 		reg = <0>;
 
+		/* TODO: power supply, always on rencently */
 		interrupts-extended = <&tlmm 175 IRQ_TYPE_LEVEL_LOW>;
 		reset-gpios = <&tlmm 99 GPIO_ACTIVE_LOW>;
 
 		spi-max-frequency = <12000000>;
 
-		himax,panel-coords = <0 1600 0 2560>;
-		himax,display-coords = <0 1600 0 2560>;
+		touchscreen-size-x = <2560>;
+		touchscreen-size-y = <1600>;
+
+		touchscreen-swapped-x-y;
+		touchscreen-inverted-x;
 
 		pinctrl-0 = <&ts0_default>;
 		pinctrl-names = "default";
