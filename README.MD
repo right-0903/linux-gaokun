@@ -1,11 +1,5 @@
 # Huawei Matebook E Go (8cx Gen 3)
 
-## future
-
-EOL since Apr, 2025. I don't own the device anymore.
-
----
-
 This repository contains workarounds for the Huawei Matebook E Go (8cx Gen 3) to support Linux.
 
 This project mainly refers to the following projects:
@@ -156,8 +150,7 @@ Front sensor can be probed, no camera video.
 The rear sensor can't be detected.
 
 ## Display
-The main problem is baclkight, resetting panel causes backlight hardware to shutdown.
-DSC with video mode is another problem, but I believe this won't causes a truly black screen.
+WIP, coming later, [White](https://github.com/whitelewi1-ctrl/matebook-e-go-linux) got dispcc and dpu issues fixed.
 
 gpio(0,1,8,20,24,52,53,...): gpio0 is backlight enable pin, gpioset -c 4 0=1/0, backlight turn on/off, gpio 52. 53, (vddp, vddn), more infomation, check [here](panel-hx83121a-dkms/dsi_pwr_seq.txt).
 
