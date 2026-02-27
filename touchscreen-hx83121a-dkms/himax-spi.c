@@ -9,12 +9,16 @@
 
 /* TODO: DT parse: vdd_dig & avdd_analog */
 
+#define DEBUG
+#include<linux/dev_printk.h>
+
 #include <linux/delay.h>
 #include <linux/input/mt.h>
 #include <linux/input/touchscreen.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/spi/spi.h>
+#include <linux/math.h>
 
 #define HIMAX_BUS_RETRY					3
 /* SPI bus read header length */
@@ -61,6 +65,7 @@ HIMAX_MAX_TX + HIMAX_MAX_RX) * 2)
 #define HIMAX_DSRAM_DATA_FW_RELOAD_DONE			0x000072c0
 /* hx83121a-specific register/dsram flags/data */
 #define HIMAX_HX83121A_DSRAM_ADDR_RAW_OUT_SEL		0x100072ec
+#define HIMAX_HX83121A_FLASH_SIZE			(255 * 1024)
 
 /* hardware register addresses */
 #define HIMAX_REG_ADDR_RELOAD_STATUS			0x80050000
@@ -623,6 +628,15 @@ static int hx83121a_gaokun_read_event_stack(struct himax_ts_data *ts)
 	return 0;
 }
 
+#define EQUILIBRIUM	0x8000
+#define THRESHOLD	0xa0 /* casual, 拉高有助于防止乱跳, 代价是灵敏度降低 */
+static u16 simple_filter(int val)
+{
+	/* 触控区貌似只会大于 EQUILIBRIUM, 如果是稳定的数据, 只会出现 0x8000 和 0x8000+ */
+	int out = abs(val - EQUILIBRIUM);
+	return out < THRESHOLD ? 0 : out;
+}
+
 /* TODO: 可以创建一个 sysfs 用于和用户空间 IO, 分析, 处理, 数据 等等 */
 static void dump_frame(u16 *ptr, bool raw)
 {
@@ -636,54 +650,106 @@ static void dump_frame(u16 *ptr, bool raw)
 
 			offset = sprintf(buf, "%04x:", i);
 		}
-		offset += sprintf(buf + offset, " %04x", raw ? ptr[i] : (u16)(ptr[i] - 0x8000));
+		offset += sprintf(buf + offset, " %04x", raw ? ptr[i] : simple_filter(ptr[i]));
 	}
 }
 
 /*
  * array 2D to 1D 且扩展处理边界外一圈
- * 即不在 tx_max * rx_max 范围内返回 默认值 0x8000
+ * 即不在 tx_max * rx_max 范围内返回 0
  */
 static inline u16 dd2d(u16 *arr, int tx, int rx)
 {
-	return (tx >= 0) * (tx < HIMAX_MAX_TX) * (rx >= 0) * (rx < HIMAX_MAX_RX)
-	       ? le16_to_cpup(arr + tx * HIMAX_MAX_RX + rx) : 0x8000;
+	return (tx >= 0) & (tx < HIMAX_MAX_TX) & (rx >= 0) & (rx < HIMAX_MAX_RX)
+	       ? simple_filter(le16_to_cpup(arr + tx * HIMAX_MAX_RX + rx)) : 0;
 }
 
-/* TODO: 利用峰值附近的多个点加权计算, 否则触控分辨率只有 60 x 40 */
-static bool is_peak(u16 *arr, int i, int j)
+#define DIS(pos0, pos1) \
+( abs(pos0->x - pos1->x) + abs(pos0->y - pos1->y) )
+
+#define REPLACE(dst, src) \
+*dst = *src;
+
+static bool is_new_point(u16 *arr, struct input_mt_pos *pos, int cnt)
 {
-	u16 center = dd2d(arr, i, j);
+	struct input_mt_pos *pos0 = pos + cnt;
+	u16 val = dd2d(arr, pos0->y, pos0->x);
+	struct input_mt_pos *posi;
+	int i;
 
-	/* TODO: 处理个别邻点相等且不为 0x8000 情况 */
-	return (center > dd2d(arr, i + 1, j)) * (center > dd2d(arr, i - 1, j))
-	       * (center > dd2d(arr, i, j + 1)) * (center > dd2d(arr, i, j - 1));
+	if (!val)
+		return false;
+
+	/* 检查 pos0 周围有没有点, 有的话保留 rawdata 更大那一个 */
+	for (i = cnt - 1; i >= 0; --i) {
+		posi = pos + i;
+
+		/* 存在之前记录的点与 '新点' 过于接近, 二选一, 保留 rawdata 更大的那个 */
+		if (DIS(pos0, posi) < 3) {
+			if (val > dd2d(arr, posi->y, posi->x))
+				REPLACE(posi, pos0); // TODO: 处理替换后与其他点距离小于3的情况?
+			return false;
+		}
+	}
+
+	/*
+	 * 与所有点都距离大于 2, 是新点, 该点早已被插入, 只要标记 true 返回即可
+	 * cnt == 0 时也会直接 true
+	 */
+	return true;
 }
 
-/* Raw data coordinate, touchscreen_report_pos will handle this (x,y swap, y invert) */
-#define TO_X(j) ((j * 2560 / HIMAX_MAX_RX) )
-#define TO_Y(i) ((i * 1600 / HIMAX_MAX_TX) )
 #define OFST 4
-static void find_peaks(u16 *arr, int tx_max, int rx_max,
-		       struct input_mt_pos *pos, int *cnt)
+static void raw2rxtx(u16 *arr, int tx_max, int rx_max,
+		     struct input_mt_pos *pos, int *cnt)
 {
 	int i, j;
-	bool peak;
 
 	*cnt = 0;
 	for (i = 0; i < tx_max; ++i)
 		for (j = 0; j < rx_max; ++j){
-			/* 单聚点多峰情况会导致超出10个点 */
 			if (*cnt >= HIMAX_MAX_TOUCH) {
 				dump_frame((void *)arr - OFST, true);
+				pr_warn("%s: more then 10 contact points\n", __func__);
 				break;
 			}
 
-			peak = is_peak(arr, i, j);
-			pos[*cnt].x = TO_X(j);
-			pos[*cnt].y = TO_Y(i);
-			*cnt += peak;
+			/* 水平方向为 rx, 垂直为 tx */
+			pos[*cnt].x = j;
+			pos[*cnt].y = i;
+			*cnt += is_new_point(arr, pos, *cnt);
 		}
+}
+
+static void rxtx2xy(u16 *arr, struct input_mt_pos *pos, int cnt)
+{
+	int i, tx, rx;
+	u16 vl, vr, vc, vu, vd;
+	unsigned long tmp;
+
+	/*
+	 * 四点权重拟合. 这里以 左 中 右 三点为例, 更进一步我们再以 中 右 为例,
+	 * 假设当前在中间, 则向右偏移 val_右/(val_中 + val_右) * (两邻点水平间距)
+	 * 同理处理左移, 上移, 下移.
+	 * TODO: 参考更多点的权值.
+	 */
+	for (i = 0; i < cnt; ++i) {
+		tx = pos[i].y;
+		rx = pos[i].x;
+		vc = dd2d(arr, tx, rx);
+		vl = dd2d(arr, tx, rx - 1);
+		vr = dd2d(arr, tx, rx + 1);
+		vu = dd2d(arr, tx - 1, rx);
+		vd = dd2d(arr, tx + 1, rx);
+		tmp = (vc + vr) * (vc + vl);
+		pos[i].x = 64 * ( (2 * rx + 1) * tmp + 2 * vc * (vr - vl) ) / (3 * tmp);
+		tmp = (vc + vu) * (vc + vd);
+		pos[i].y = 20 * ( (2 * tx + 1) * tmp + 2 * vc * (vd - vu) ) / tmp;
+		pr_debug("calculate x: 64 * ( (2 * %d + 1) * %lu + 2 * %d * (%d - %d) ) / (3 * %lu) = %d\n",
+			 rx, tmp, vc, vr, vl, tmp, pos[i].x);
+		pr_debug("calculate y: 20 * ( (2 * %d + 1) * %lu + 2 * %d * (%d - %d) ) / %lu = %d\n",
+			 tx, tmp, vc, vd, vu, tmp, pos[i].y);
+	}
 }
 
 static irqreturn_t himax_ts_thread(int irq, void *data)
@@ -698,9 +764,10 @@ static irqreturn_t himax_ts_thread(int irq, void *data)
 	 * 手指触摸以避免漏掉数据. 至少请设置为 10, 100hz 较为接近实际刷新率, 不设置会发生
 	 * 数据错误.
 	 */
-	if (time_before(jiffies, ts->update_time +
-		msecs_to_jiffies(10)))
+	if (time_before(jiffies, ts->update_time + msecs_to_jiffies(20))) {
+		drop_cnt++;
 		return IRQ_HANDLED;
+	}
 
 	if (hx83121a_gaokun_read_event_stack(ts)) {
 		dev_err(ts->dev, "failed to get touch data!\n");
@@ -710,9 +777,18 @@ static irqreturn_t himax_ts_thread(int irq, void *data)
 
 	// dump_frame((void *)ptr - OFST, true);
 
-	/* 右下角的最后一个触控通道 永远是 0x0000, 重置成默认值, 方便后续峰值查找时的处理 */
-	ptr[0] = 0x8000;
-	find_peaks(ptr, HIMAX_MAX_TX, HIMAX_MAX_RX, pos, &cnt);
+	/* 右下角的最后一个触控通道 永远是 0x0000, 重置成默认值, 方便后续的处理 */
+	ptr[0] = EQUILIBRIUM;
+	raw2rxtx(ptr, HIMAX_MAX_TX, HIMAX_MAX_RX, pos, &cnt);
+	for (int i = 0; i < cnt; ++i) {
+		dev_dbg(ts->dev, "rx-tx %d: %d, %d\n", i, pos[i].x, pos[i].y);
+	}
+
+	rxtx2xy(ptr, pos, cnt);
+	/* Not final results, touchscreen_report_pos will handle this (x-y swap, y invert) */
+	for (int i = 0; i < cnt; ++i) {
+		dev_dbg(ts->dev, "x-y %d: %d, %d\n", i, pos[i].x, pos[i].y);
+	}
 
 	/* 这里报告给系统的坐标数据可以通过 evtest 查看 */
 	himax_report_state(ts, pos, cnt);
@@ -945,9 +1021,9 @@ static int himax_spi_probe(struct spi_device *spi)
 		return ret;
 	}
 
-	ret = himax_mcu_check_crc(ts, 0, 255 * 1024, &crc_hw);
+	ret = himax_mcu_check_crc(ts, 0, HIMAX_HX83121A_FLASH_SIZE, &crc_hw);
 	if (ret || crc_hw) {
-		dev_err(ts->dev, "hw crc failed\n");
+		dev_err(ts->dev, "hw crc failed, fw broken, fix it on windows\n");
 		return ret;
 	}
 
