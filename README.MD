@@ -44,7 +44,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | Bluetooth | works | Adding board file for wifi will improve RF performance |
 | Camera | x | |
 | CPUfreq | works | |
-| Display | x | check below |
+| Display | works | check below |
 | Display sensors | x | for rotation detect, light detect, etc. slpi related? |
 | EC | works | Battery and adapter status, wmi, ucsi,maybe modern standby |
 | EFI variables | works | |

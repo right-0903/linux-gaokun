@@ -1,0 +1,28 @@
+From 98718045604508a75f6a4356dc2c071f2ceefc8e Mon Sep 17 00:00:00 2001
+From: Pengyu Luo <mitltlatltl@gmail.com>
+Date: Sat, 28 Feb 2026 16:32:29 +0800
+Subject: [PATCH v3 1/4] dt-bindings: display: msm-dsi-phy-7nm: Add SC8280XP
+
+Since SC8280XP and SA8775P have the same values for the REVISION_ID
+registers, then we fallback to SA8775P compatible.
+
+Signed-off-by: Pengyu Luo <mitltlatltl@gmail.com>
+---
+ Documentation/devicetree/bindings/display/msm/dsi-phy-7nm.yaml | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/display/msm/dsi-phy-7nm.yaml b/Documentation/devicetree/bindings/display/msm/dsi-phy-7nm.yaml
+index 9a9a6c4ab..532f37182 100644
+--- a/Documentation/devicetree/bindings/display/msm/dsi-phy-7nm.yaml
++++ b/Documentation/devicetree/bindings/display/msm/dsi-phy-7nm.yaml
+@@ -32,6 +32,7 @@ properties:
+       - items:
+           - enum:
+               - qcom,qcs8300-dsi-phy-5nm
++              - qcom,sc8280xp-dsi-phy-5nm
+           - const: qcom,sa8775p-dsi-phy-5nm
+ 
+   reg:
+-- 
+2.53.0
+

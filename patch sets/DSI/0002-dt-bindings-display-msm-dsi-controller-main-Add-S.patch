@@ -1,0 +1,29 @@
+From fe11ff1e471c7ea0fd19b3248da4b229329093be Mon Sep 17 00:00:00 2001
+From: Pengyu Luo <mitltlatltl@gmail.com>
+Date: Sat, 28 Feb 2026 17:28:08 +0800
+Subject: [PATCH v3 2/4] dt-bindings: display/msm: dsi-controller-main: Add
+ SC8280XP
+
+Since SC8280XP and SA8775P have the same DSI version(2.5.1), then we
+fallback to SA8775P compatible.
+
+Signed-off-by: Pengyu Luo <mitltlatltl@gmail.com>
+---
+ .../devicetree/bindings/display/msm/dsi-controller-main.yaml     | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/display/msm/dsi-controller-main.yaml b/Documentation/devicetree/bindings/display/msm/dsi-controller-main.yaml
+index eb6d38dab..617dd110d 100644
+--- a/Documentation/devicetree/bindings/display/msm/dsi-controller-main.yaml
++++ b/Documentation/devicetree/bindings/display/msm/dsi-controller-main.yaml
+@@ -49,6 +49,7 @@ properties:
+       - items:
+           - enum:
+               - qcom,qcs8300-dsi-ctrl
++              - qcom,sc8280xp-dsi-ctrl
+           - const: qcom,sa8775p-dsi-ctrl
+           - const: qcom,mdss-dsi-ctrl
+       - enum:
+-- 
+2.53.0
+
