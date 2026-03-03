@@ -1,0 +1,40 @@
+From 67e70c49c845bad2935de23a665eec98eeeaa314 Mon Sep 17 00:00:00 2001
+From: Pengyu Luo <mitltlatltl@gmail.com>
+Date: Tue, 3 Mar 2026 22:34:22 +0800
+Subject: [PATCH] clk: qcom: dispcc-sc8280xp: Don't park mdp_clk_src at
+ registration time
+
+Parking disp{0,1}_cc_mdss_mdp_clk_src clk broke simplefb on HUAWEI
+Gaokun3, the image will stuck at grey for seconds until msm takes
+over framebuffer. Use clk_rcg2_shared_no_init_park_ops to skip it.
+
+Signed-off-by: Pengyu Luo <mitltlatltl@gmail.com>
+---
+ drivers/clk/qcom/dispcc-sc8280xp.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clk/qcom/dispcc-sc8280xp.c b/drivers/clk/qcom/dispcc-sc8280xp.c
+index e91dfed0f..acc927c21 100644
+--- a/drivers/clk/qcom/dispcc-sc8280xp.c
++++ b/drivers/clk/qcom/dispcc-sc8280xp.c
+@@ -977,7 +977,7 @@ static struct clk_rcg2 disp0_cc_mdss_mdp_clk_src = {
+ 		.name = "disp0_cc_mdss_mdp_clk_src",
+ 		.parent_data = disp0_cc_parent_data_5,
+ 		.num_parents = ARRAY_SIZE(disp0_cc_parent_data_5),
+-		.ops = &clk_rcg2_shared_ops,
++		.ops = &clk_rcg2_shared_no_init_park_ops,
+ 	},
+ };
+ 
+@@ -991,7 +991,7 @@ static struct clk_rcg2 disp1_cc_mdss_mdp_clk_src = {
+ 		.name = "disp1_cc_mdss_mdp_clk_src",
+ 		.parent_data = disp1_cc_parent_data_5,
+ 		.num_parents = ARRAY_SIZE(disp1_cc_parent_data_5),
+-		.ops = &clk_rcg2_shared_ops,
++		.ops = &clk_rcg2_shared_no_init_park_ops,
+ 	},
+ };
+ 
+-- 
+2.53.0
+

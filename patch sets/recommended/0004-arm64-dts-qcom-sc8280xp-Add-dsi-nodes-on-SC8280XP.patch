@@ -164,7 +164,7 @@ index 706eb1309..1599d698b 100644
 +			};
 +
 +			mdss0_dsi0_phy: phy@ae94400 {
-+				compatible = "qcom,sc8280xp-dsi-phy-5nm"
++				compatible = "qcom,sc8280xp-dsi-phy-5nm",
 +					     "qcom,sa8775p-dsi-phy-5nm";
 +				reg = <0 0x0ae94400 0 0x200>,
 +				      <0 0x0ae94600 0 0x280>,
@@ -246,7 +246,7 @@ index 706eb1309..1599d698b 100644
 +			};
 +
 +			mdss0_dsi1_phy: phy@ae96400 {
-+				compatible = "qcom,sc8280xp-dsi-phy-5nm"
++				compatible = "qcom,sc8280xp-dsi-phy-5nm",
 +					     "qcom,sa8775p-dsi-phy-5nm";
 +				reg = <0 0x0ae96400 0 0x200>,
 +				      <0 0x0ae96600 0 0x280>,
@@ -398,7 +398,7 @@ index 706eb1309..1599d698b 100644
 +			};
 +
 +			mdss1_dsi0_phy: phy@22094400 {
-+				compatible = "qcom,sc8280xp-dsi-phy-5nm"
++				compatible = "qcom,sc8280xp-dsi-phy-5nm",
 +					     "qcom,sa8775p-dsi-phy-5nm";
 +				reg = <0 0x22094400 0 0x200>,
 +				      <0 0x22094600 0 0x280>,
@@ -480,7 +480,7 @@ index 706eb1309..1599d698b 100644
 +			};
 +
 +			mdss1_dsi1_phy: phy@22096400 {
-+				compatible = "qcom,sc8280xp-dsi-phy-5nm"
++				compatible = "qcom,sc8280xp-dsi-phy-5nm",
 +					     "qcom,sa8775p-dsi-phy-5nm";
 +				reg = <0 0x22096400 0 0x200>,
 +				      <0 0x22096600 0 0x280>,
