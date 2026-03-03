@@ -11,7 +11,6 @@
 
 /dts-v1/;
 
-#include <dt-bindings/clock/qcom,dsi-phy-28nm.h>
 #include <dt-bindings/iio/qcom,spmi-adc7-pm8350.h>
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/gpio-keys.h>
@@ -21,6 +20,7 @@
 
 #include "sc8280xp.dtsi"
 #include "sc8280xp-pmics.dtsi"
+#include "sc8280xp-huawei-gaokun3-camera.dtsi"
 
 / {
 	chassis-type = "tablet";
@@ -28,9 +28,25 @@
 	compatible = "huawei,gaokun3", "qcom,sc8280xp";
 
 	aliases {
-		i2c4 = &i2c4;
 		i2c15 = &i2c15;
-		serial0 = &uart2;
+		serial1 = &uart2;
+		spi6 = &spi6;
+		spi20 = &spi20;
+	};
+
+	chosen {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		framebuffer0: framebuffer@c6200000 {
+			compatible = "simple-framebuffer";
+			reg = <0x0 0xC6200000 0x0 0x02400000>;
+			width = <1600>;
+			height = <2560>;
+			stride = <(1600 * 4)>;
+			format = "a8r8g8b8";
+		};
 	};
 
 	wcd938x: audio-codec {
@@ -73,8 +89,7 @@
 			linux,can-disable;
 			wakeup-source;
 		};
-/*
-		// FIXME: touchpad won't work after detaching
+
 		switch-mode {
 			label = "Tablet Mode Switch";
 			gpios = <&tlmm 26 GPIO_ACTIVE_HIGH>;
@@ -83,7 +98,7 @@
 			debounce-interval = <10>;
 			wakeup-source;
 		};
-*/	};
+	};
 
 	vreg_misc_3p3: regulator-misc-3p3 {
 		compatible = "regulator-fixed";
@@ -209,8 +224,8 @@
 
 		select-gpios = <&tlmm 164 GPIO_ACTIVE_HIGH>;
 
-		pinctrl-0 = <&usb0_sbu_default>;
 		pinctrl-names = "default";
+		pinctrl-0 = <&usb0_sbu_default>;
 
 		orientation-switch;
 
@@ -226,8 +241,8 @@
 
 		select-gpios = <&tlmm 47 GPIO_ACTIVE_HIGH>;
 
-		pinctrl-0 = <&usb1_sbu_default>;
 		pinctrl-names = "default";
+		pinctrl-0 = <&usb1_sbu_default>;
 
 		orientation-switch;
 
@@ -348,8 +363,8 @@
 
 		vreg_l2b: ldo2 {
 			regulator-name = "vreg_l2b";
-			regulator-min-microvolt = <1800000>;
-			regulator-max-microvolt = <1800000>;
+			regulator-min-microvolt = <1904000>;
+			regulator-max-microvolt = <1904000>;
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 		};
 
@@ -374,6 +389,13 @@
 						   RPMH_REGULATOR_MODE_HPM>;
 		};
 
+		vreg_l5b: ldo5 {
+			regulator-name = "vreg_l5b";
+			regulator-min-microvolt = <1200000>;
+			regulator-max-microvolt = <1200000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+
 		vreg_l6b: ldo6 {
 			regulator-name = "vreg_l6b";
 			regulator-min-microvolt = <880000>;
@@ -383,6 +405,21 @@
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
 						   RPMH_REGULATOR_MODE_HPM>;
+		};
+
+		vreg_l7b: ldo7 {
+			regulator-name = "vreg_l7b";
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <1800000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+			regulator-boot-on;
+		};
+
+		vreg_l9b: ldo9 {
+			regulator-name = "vreg_l9b";
+			regulator-min-microvolt = <912000>;
+			regulator-max-microvolt = <912000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 		};
 	};
 
@@ -405,8 +442,6 @@
 			regulator-always-on;
 		};
 
-		/* s2c, s3c */
-
 		vreg_l1c: ldo1 {
 			regulator-name = "vreg_l1c";
 			regulator-min-microvolt = <1800000>;
@@ -416,7 +451,13 @@
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
 						   RPMH_REGULATOR_MODE_HPM>;
 		};
-		/* l2c, l3c,... s13c */
+
+		vreg_l2c: ldo2 {
+			regulator-name = "vreg_l2c";
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <1800000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
 
 		vreg_l8c: ldo8 {
 			regulator-name = "vreg_l8c";
@@ -464,7 +505,6 @@
 		vdd-l6-l9-l10-supply = <&vreg_s12b>;
 		vdd-l8-supply = <&vreg_s12b>;
 
-		/* s10d, s11d, s12d */
 		vreg_l2d: ldo2 {
 			regulator-name = "vreg_l2d";
 			regulator-min-microvolt = <3072000>;
@@ -473,6 +513,13 @@
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
 						   RPMH_REGULATOR_MODE_HPM>;
+		};
+
+		vreg_l3d: ldo3 {
+			regulator-name = "vreg_l3d";
+			regulator-min-microvolt = <1200000>;
+			regulator-max-microvolt = <1200000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l4d: ldo4 {
@@ -524,7 +571,7 @@
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
 						   RPMH_REGULATOR_MODE_HPM>;
 		};
-/*
+
 		vreg_l10d: ldo10 {
 			regulator-name = "vreg_l10d";
 			regulator-min-microvolt = <912000>;
@@ -534,11 +581,7 @@
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
 						   RPMH_REGULATOR_MODE_HPM>;
 		};
-*/
 	};
-	/* pmr735a
-	 * "PPP_RESOURCE_ID_SMPS3_E" / s3e
-	 */
 };
 
 &dispcc0 {
@@ -566,46 +609,6 @@
 	};
 };
 
-
-&i2c4 {
-	clock-frequency = <400000>;
-
-	pinctrl-0 = <&i2c4_default>;
-	pinctrl-names = "default";
-
-	status = "okay";
-
-	/* There are something */
-};
-
-
-&spi6 {
-	pinctrl-0 = <&spi6_default>;
-	pinctrl-names = "default";
-
-	status = "okay";
-
-	touchscreen@0 {
-		compatible = "himax,hx83121a";
-		reg = <0>;
-
-		/* TODO: power supply, always on rencently */
-		interrupts-extended = <&tlmm 175 IRQ_TYPE_LEVEL_LOW>;
-		reset-gpios = <&tlmm 99 GPIO_ACTIVE_LOW>;
-
-		spi-max-frequency = <12000000>;
-
-		touchscreen-size-x = <2560>;
-		touchscreen-size-y = <1600>;
-
-		touchscreen-swapped-x-y;
-		touchscreen-inverted-x;
-
-		pinctrl-0 = <&ts0_default>;
-		pinctrl-names = "default";
-	};
-};
-
 &i2c15 {
 	clock-frequency = <400000>;
 
@@ -618,7 +621,7 @@
 		compatible = "huawei,gaokun3-ec";
 		reg = <0x38>;
 
-		interrupts-extended = <&tlmm 107 IRQ_TYPE_LEVEL_LOW>; /* shared */
+		interrupts-extended = <&tlmm 107 IRQ_TYPE_LEVEL_LOW>;
 
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -628,6 +631,7 @@
 			reg = <0>;
 			power-role = "dual";
 			data-role = "dual";
+
 			ports {
 				#address-cells = <1>;
 				#size-cells = <0>;
@@ -635,21 +639,13 @@
 				port@0 {
 					reg = <0>;
 
-					ucsi0_hs_in: endpoint { // highspeed, usb2.0, role_switch
-						remote-endpoint = <&usb_0_dwc3_hs>;
+					ucsi0_ss_in: endpoint {
+						remote-endpoint = <&usb_0_qmpphy_out>;
 					};
 				};
 
 				port@1 {
 					reg = <1>;
-
-					ucsi0_ss_in: endpoint { // superspeed, usb3.0
-						remote-endpoint = <&usb_0_qmpphy_out>;
-					};
-				};
-
-				port@2 {
-					reg = <2>;
 
 					ucsi0_sbu: endpoint {
 						remote-endpoint = <&usb0_sbu_mux>;
@@ -671,21 +667,13 @@
 				port@0 {
 					reg = <0>;
 
-					ucsi1_hs_in: endpoint {
-						remote-endpoint = <&usb_1_dwc3_hs>;
-					};
-				};
-
-				port@1 {
-					reg = <1>;
-
 					ucsi1_ss_in: endpoint {
 						remote-endpoint = <&usb_1_qmpphy_out>;
 					};
 				};
 
-				port@2 {
-					reg = <2>;
+				port@1 {
+					reg = <1>;
 
 					ucsi1_sbu: endpoint {
 						remote-endpoint = <&usb1_sbu_mux>;
@@ -705,8 +693,7 @@
 };
 
 &mdss0_dp0_out {
-	data-lanes = <0 1 2 3>;
-	link-frequencies = /bits/ 64 <1620000000 2700000000 5400000000 8100000000>;
+	data-lanes = <0 1>;
 	remote-endpoint = <&usb_0_qmpphy_dp_in>;
 };
 
@@ -715,8 +702,7 @@
 };
 
 &mdss0_dp1_out {
-	data-lanes = <0 1 2 3>;
-	link-frequencies = /bits/ 64 <1620000000 2700000000 5400000000 8100000000>;
+	data-lanes = <0 1>;
 	remote-endpoint = <&usb_1_qmpphy_dp_in>;
 };
 
@@ -730,7 +716,7 @@
 	status = "okay";
 
 	panel@0 {
-		compatible = "csot,ppc357db1-4";
+		compatible = "himax,hx83121a";
 		reg = <0>;
 
 		pinctrl-0 = <&disp_reset_n>, <&mdp_vsync_active>;
@@ -738,10 +724,8 @@
 
 		reset-gpios = <&tlmm 38 GPIO_ACTIVE_LOW>;
 
-		vddi-supply = <&vreg_l2b>;
-		// TODO: add avdd avee, gpio pin 52, 53
-		// avdd-supply = ;
-		// avee-supply = ;
+		vddio-supply = <&vreg_l2b>;
+		rotation = <90>;
 
 		ports {
 			#address-cells = <1>;
@@ -786,8 +770,7 @@
 	status = "okay";
 
 	/* DSI1 is slave, so use DSI0 clocks */
-	assigned-clock-parents = <&mdss0_dsi0_phy DSI_BYTE_PLL_CLK>,
-				 <&mdss0_dsi0_phy DSI_PIXEL_PLL_CLK>;
+	assigned-clock-parents = <&mdss0_dsi0_phy 0>, <&mdss0_dsi0_phy 1>;
 };
 
 &mdss0_dsi1_out {
@@ -849,8 +832,7 @@
 		vddrfa1p2-supply = <&vreg_pmu_rfa_1p2>;
 		vddrfa1p8-supply = <&vreg_pmu_rfa_1p7>;
 
-		/* HACK: qmi-chip-id=18 */
-		qcom,calibration-variant = "NTM_TW220";
+		qcom,ath11k-calibration-variant = "HW_GK3";
 	};
 };
 
@@ -1125,6 +1107,54 @@
 	};
 };
 
+/* THPA, HIMX0001 */
+&spi6 {
+	pinctrl-0 = <&spi6_default>;
+	pinctrl-names = "default";
+
+	status = "okay";
+
+	touchscreen@0 {
+		compatible = "himax,hx83121a";
+		reg = <0>;
+
+		/* TODO: power supply, always on rencently */
+		interrupts-extended = <&tlmm 175 IRQ_TYPE_LEVEL_LOW>;
+		reset-gpios = <&tlmm 99 GPIO_ACTIVE_LOW>;
+
+		spi-max-frequency = <12000000>;
+
+		touchscreen-size-x = <2560>;
+		touchscreen-size-y = <1600>;
+
+		touchscreen-swapped-x-y;
+		touchscreen-inverted-x;
+
+		pinctrl-0 = <&ts0_default>;
+		pinctrl-names = "default";
+	};
+};
+
+/* THPB, HIMX0002 */
+&spi20 {
+	pinctrl-0 = <&spi20_default>;
+    	pinctrl-names = "default";
+
+	status = "okay";
+
+	stylus@0 {
+		compatible = "himax,hx83121a-ts-stylus";
+		reg = <0>;
+
+		interrupts-extended = <&tlmm 39 IRQ_TYPE_LEVEL_LOW>;
+
+		spi-max-frequency = <12000000>;
+
+		pinctrl-0 = <&stylus_int_n_default>;
+		pinctrl-names = "default";
+	};
+};
+
 &swr0 {
 	status = "okay";
 
@@ -1209,12 +1239,8 @@
 	dr_mode = "host";
 };
 
-&usb_0_dwc3_hs {
-	remote-endpoint = <&ucsi0_hs_in>;
-};
-
 &usb_0_hsphy {
-	vdda-pll-supply = <&vreg_l6d>;
+	vdda-pll-supply = <&vreg_l9d>;
 	vdda18-supply = <&vreg_l1c>;
 	vdda33-supply = <&vreg_l7d>;
 
@@ -1222,10 +1248,9 @@
 };
 
 &usb_0_qmpphy {
-	vdda-phy-supply = <&vreg_l4d>;
-	vdda-pll-supply = <&vreg_l9d>;
+	vdda-phy-supply = <&vreg_l9d>;
+	vdda-pll-supply = <&vreg_l4d>;
 
-	mode-switch;
 	orientation-switch;
 
 	status = "okay";
@@ -1247,12 +1272,8 @@
 	dr_mode = "host";
 };
 
-&usb_1_dwc3_hs {
-	remote-endpoint = <&ucsi1_hs_in>;
-};
-
 &usb_1_hsphy {
-	vdda-pll-supply = <&vreg_l6b>;
+	vdda-pll-supply = <&vreg_l4b>;
 	vdda18-supply = <&vreg_l1c>;
 	vdda33-supply = <&vreg_l13c>;
 
@@ -1260,8 +1281,8 @@
 };
 
 &usb_1_qmpphy {
-	vdda-phy-supply = <&vreg_l3b>;
-	vdda-pll-supply = <&vreg_l4b>;
+	vdda-phy-supply = <&vreg_l4b>;
+	vdda-pll-supply = <&vreg_l3b>;
 
 	orientation-switch;
 
@@ -1281,7 +1302,7 @@
 };
 
 &usb_2_hsphy0 {
-	vdda-pll-supply = <&vreg_l6d>;
+	vdda-pll-supply = <&vreg_l1b>;
 	vdda18-supply = <&vreg_l1c>;
 	vdda33-supply = <&vreg_l7d>;
 
@@ -1289,7 +1310,7 @@
 };
 
 &usb_2_hsphy1 {
-	vdda-pll-supply = <&vreg_l6d>;
+	vdda-pll-supply = <&vreg_l8d>;
 	vdda18-supply = <&vreg_l1c>;
 	vdda33-supply = <&vreg_l7d>;
 
@@ -1297,7 +1318,7 @@
 };
 
 &usb_2_hsphy2 {
-	vdda-pll-supply = <&vreg_l6d>;
+	vdda-pll-supply = <&vreg_l10d>;
 	vdda18-supply = <&vreg_l8c>;
 	vdda33-supply = <&vreg_l2d>;
 
@@ -1305,7 +1326,7 @@
 };
 
 &usb_2_hsphy3 {
-	vdda-pll-supply = <&vreg_l6d>;
+	vdda-pll-supply = <&vreg_l10d>;
 	vdda18-supply = <&vreg_l8c>;
 	vdda33-supply = <&vreg_l2d>;
 
@@ -1313,15 +1334,15 @@
 };
 
 &usb_2_qmpphy0 {
-	vdda-phy-supply = <&vreg_l4d>;
-	vdda-pll-supply = <&vreg_l1b>;
+	vdda-phy-supply = <&vreg_l1b>;
+	vdda-pll-supply = <&vreg_l4d>;
 
 	status = "okay";
 };
 
 &usb_2_qmpphy1 {
-	vdda-phy-supply = <&vreg_l4d>;
-	vdda-pll-supply = <&vreg_l8d>;
+	vdda-phy-supply = <&vreg_l8d>;
+	vdda-pll-supply = <&vreg_l4d>;
 
 	status = "okay";
 };
@@ -1414,16 +1435,16 @@
 		bias-pull-up;
 	};
 
+	mode_pin_active: mode-pin-state {
+		pins = "gpio26";
+		function = "gpio";
+		bias-disable;
+	};
+
 	mdp_vsync_active: mdss-te-state {
 		pins = "gpio8";
 		function = "mdp_vsync";
 		drive-strength = <2>;
-		bias-disable;
-	};
-
-	mode_pin_active: mode-pin-state {
-		pins = "gpio26";
-		function = "gpio";
 		bias-disable;
 	};
 
@@ -1480,24 +1501,12 @@
 		};
 	};
 
-	spkr_1_sd_n_default: spkr-1-sd-n-default-state {
-		perst-n-pins {
-			pins = "gpio178";
+	stylus_int_n_default: stylus-int-n-state {
+			pins = "gpio39";
 			function = "gpio";
-			drive-strength = <16>;
+			drive-strength = <2>;
 			bias-disable;
 			output-high;
-		};
-	};
-
-	spkr_2_sd_n_default: spkr-2-sd-n-default-state {
-		perst-n-pins {
-			pins = "gpio179";
-			function = "gpio";
-			drive-strength = <16>;
-			bias-disable;
-			output-high;
-		};
 	};
 
 	spi6_default: spi6-default-state {
@@ -1529,6 +1538,59 @@
 			function = "qup6";
 			drive-strength = <2>;
 			bias-pull-down;
+			output-high;
+		};
+	};
+
+	spi20_default: spi20-default-state {
+		miso-n-pins {
+			pins = "gpio87";
+			function = "qup20";
+			drive-strength = <2>;
+			bias-pull-down;
+		};
+
+		mosi-n-pins {
+			pins = "gpio88";
+			function = "qup20";
+			drive-strength = <2>;
+			bias-pull-down;
+			output-high;
+		};
+
+		clk-n-pins {
+			pins = "gpio89";
+			function = "qup20";
+			drive-strength = <2>;
+			bias-pull-down;
+			output-high;
+		};
+
+		cs-n-pins {
+			pins = "gpio90";
+			function = "qup20";
+			drive-strength = <2>;
+			bias-pull-down;
+			output-high;
+		};
+	};
+
+	spkr_1_sd_n_default: spkr-1-sd-n-default-state {
+		perst-n-pins {
+			pins = "gpio178";
+			function = "gpio";
+			drive-strength = <16>;
+			bias-disable;
+			output-high;
+		};
+	};
+
+	spkr_2_sd_n_default: spkr-2-sd-n-default-state {
+		perst-n-pins {
+			pins = "gpio179";
+			function = "gpio";
+			drive-strength = <16>;
+			bias-disable;
 			output-high;
 		};
 	};
@@ -1581,15 +1643,15 @@
 	usb0_sbu_default: usb0-sbu-state {
 		pins = "gpio164";
 		function = "gpio";
-		drive-strength = <16>;
 		bias-disable;
+		drive-strength = <16>;
 	};
 
 	usb1_sbu_default: usb1-sbu-state {
 		pins = "gpio47";
 		function = "gpio";
-		drive-strength = <16>;
 		bias-disable;
+		drive-strength = <16>;
 	};
 
 	wcd_default: wcd-default-state {
