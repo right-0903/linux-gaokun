@@ -1,1 +1,0 @@
-../../../../../gaokun-ec-dkms/ucsi_huawei_gaokun.c

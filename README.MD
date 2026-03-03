@@ -15,15 +15,17 @@ This project mainly refers to the following projects:
 ## Upstream Progress
 ~Initial dt support will land on 6.14.~(landed)
 
-Initial EC support will land on 6.15.
+~Initial EC support will land on 6.15.~(landed)
 
-Initial UCSI support will land on 6.16.
+~Initial UCSI support will land on 6.16.~(landed)
+
+WIP to make dsi panel land on 7.1
 
 ## Disclaimer
 I am just an amateur, a Linux noob, not educated with formal CS courses. You should never believe what I say below, except this sentence. I am not responsible for your actions; you do this all at your own risk!
 
 ## Kernel
-Use steev or jhovold one with default config and `simplefb` enabled. (My AUR [here](https://aur.archlinux.org/pkgbase/linux-gaokun3))
+Use mainline with [recommended patches](./patch\ sets/recommended). (My AUR [here](https://aur.archlinux.org/pkgbase/linux-gaokun3))
 
 Kernel parameter: `clk_ignore_unused pd_ignore_unused arm64.nopauth efi=noruntime`
 
@@ -39,14 +41,14 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | Feature | Status | Note |
 | ------- | ------ | ---- |
 | Audio  | works | see [below](#audio) |
-| Backlight | x | unknow I2C baclkight IC |
+| Backlight | works | dcs dimming, backlihgt ic should be i2c4 @?? |
 | Battery | works | For more attributes, check `/sys/class/power_supply/gaokun-ec-battery/*`  |
 | Bluetooth | works | Adding board file for wifi will improve RF performance |
 | Camera | x | |
 | CPUfreq | works | |
-| Display | works | check below |
-| Display sensors | x | for rotation detect, light detect, etc. slpi related? |
-| EC | works | Battery and adapter status, wmi, ucsi,maybe modern standby |
+| Display | works |  |
+| Display sensors | untested | for rotation detect, light detect, etc. slpi and [fastrpc](https://github.com/qualcomm/fastrpc)  |
+| EC | works | Battery and adapter status, wmi, ucsi, modern standby |
 | EFI variables | works | |
 | Fingerprint reader | x | FTE7001, gpio185 |
 | GPU | works | Freedreno 690([FD690](./feature_spoliers/gpu.png)), `vulkan-freedreno` for vulkan support. |
@@ -62,12 +64,12 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | Suspend | works | s2idle |
 | Thermal sensors | works |  |
 | Touchscreen over i2c | partial | weird behavior, I think NHLOS use this, such as BIOS configuration |
-| Touchscreen over spi | partial | resolution is 60 \times 40 temporarily, it requires algorithm to handle raw frame data |
+| Touchscreen over spi | partial | resolution is low temporarily, it requires algorithm to handle raw frame data |
 | TPM | x | |
 | USB | works | |
 | USB-PD | works | fast charging(45W+) supported with UCSI EC driver |
-| USB-C DisplayPort Alt Mode | works |  |
-| Video acceleration | works | see [below](#Video-acceleration) |
+| USB-C DisplayPort Alt Mode | works | it may be broken nowadays (untested since ~6.14) |
+| Video acceleration | untested | see [below](#Video-acceleration) |
 | Virtualisation | x | |
 | Volumn keys | works | |
 | Watchdog | partial | One in sc8280xp works, another in EC not |
@@ -81,9 +83,9 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 > [!CAUTION]
 > Recently, UCSI subsystem is buggy for this tablet. Chances are that failed to boot(auto reboot). Only plug into Type-C ports after booting up.
 
-Addition: UCSI failed to register in 6.14, no sure about future (I don't own this device anymore, no fix from me)
+Addition: UCSI failed to register in 6.14, no sure about future ~(I don't own this device anymore, no fix from me)~
 
-Support 2-lane only for now(only half of clocks are enabled), Johan mentioned [this](https://github.com/jhovold/linux/wiki/X13s#USB) also, but we don't require insert orientation.
+~Support 2-lane only for now(only half of clocks are enabled), Johan mentioned [this](https://github.com/jhovold/linux/wiki/X13s#USB) also, but we don't require insert orientation.~
 
 In default, the bandwidth of per lane is limited to 5.4Gbps(HBR2, DisplayPort 1.2 or later). If you want to a higher limit, set this.
 
@@ -150,7 +152,7 @@ Front sensor can be probed, no camera video.
 The rear sensor can't be detected.
 
 ## Display
-WIP, coming later, [White](https://github.com/whitelewi1-ctrl/matebook-e-go-linux) got dispcc and dpu issues fixed.
+[White](https://github.com/whitelewi1-ctrl/matebook-e-go-linux) got dispcc and dpu issues fixed, display is working now.
 
 gpio(0,1,8,20,24,52,53,...): gpio0 is backlight enable pin, gpioset -c 4 0=1/0, backlight turn on/off, gpio 52. 53, (vddp, vddn), more infomation, check [here](panel-hx83121a-dkms/dsi_pwr_seq.txt).
 
@@ -175,11 +177,8 @@ temp20:       +25.9°C
 
 ## SLPI
 SLPI(Sensor Low Power Island), [more details](https://lore.kernel.org/linux-devicetree/20230406173148.28309-1-me@dylanvanassche.be/).
-```
-[    2.606897] remoteproc remoteproc2: remote processor 2400000.remoteproc is now up
-[    2.613505] qcom,fastrpc 2400000.remoteproc:glink-edge.fastrpcglink-apps-dsp.-1.-1: no reserved DMA memory for FASTRPC
-```
-No `IOMMU`, The firmware of slpi can be loaded, you can also find `/dev/fastrpc-sdsp`, but the DT in my patch is wrong, sensors won't work.
+
+[Fastrpc reference](https://github.com/qualcomm/fastrpc).
 
 ## Video acceleration
 The firmware can be loaded. It supports v4l2_m2m, never tested it.

@@ -1,1 +1,0 @@
-../../../../gaokun-ec-dkms/huawei-gaokun-battery.c
