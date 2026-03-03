@@ -19,8 +19,8 @@ index eb370a7d4..fedcfb802 100644
 -					<&mmss_noc MASTER_MDP1 0 &mc_virt SLAVE_EBI1 0>;
 -			interconnect-names = "mdp0-mem", "mdp1-mem";
 +					<&mmss_noc MASTER_MDP1 0 &mc_virt SLAVE_EBI1 0>,
-+					<&gem_noc MASTER_APPSS_PROC QCOM_ICC_TAG_ACTIVE_ONLY
-+					 &config_noc SLAVE_DISPLAY_CFG QCOM_ICC_TAG_ACTIVE_ONLY>;
++					<&gem_noc MASTER_APPSS_PROC 3
++					 &config_noc SLAVE_DISPLAY_CFG 3>;
 +			interconnect-names = "mdp0-mem",
 +					     "mdp1-mem",
 +					     "cpu-cfg";
