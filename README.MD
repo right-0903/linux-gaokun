@@ -25,7 +25,7 @@ WIP to make dsi panel land on 7.1
 I am just an amateur, a Linux noob, not educated with formal CS courses. You should never believe what I say below, except this sentence. I am not responsible for your actions; you do this all at your own risk!
 
 ## Kernel
-Use mainline with [recommended patches](./patch\ sets/recommended). (My AUR [here](https://aur.archlinux.org/pkgbase/linux-gaokun3))
+Use mainline with [recommended patches](./patch%20sets/recommended). (My AUR [here](https://aur.archlinux.org/pkgbase/linux-gaokun3))
 
 Kernel parameter: `clk_ignore_unused pd_ignore_unused arm64.nopauth efi=noruntime`
 
