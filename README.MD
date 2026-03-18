@@ -10,7 +10,7 @@ This project mainly refers to the following projects:
 * [aymanbagabas](https://github.com/aymanbagabas/Huawei-WMI): Huawei laptop wmi driver.
 * [NewWheat](https://gitlab.com/New-Wheat/linux-for-huawei-matebook-e-2019): yet anoter arm64 EC driver, and help from him.
 * [chenxuecong2](https://github.com/chenxuecong2/linux-huawei-matebook-e-go) & [matalama80td3l](https://github.com/matalama80td3l/matebook-e-go-boot-works): initial device tree for the Huawei Matebook E Go.
-
+* [White](https://github.com/whitelewi1-ctrl/matebook-e-go-linux): Dispcc and DPU fixes. hid over i2c fixes.
 
 ## Upstream Progress
 ~Initial dt support will land on 6.14.~(landed)
@@ -63,7 +63,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | RTC | works | |
 | Suspend | works | s2idle |
 | Thermal sensors | works |  |
-| Touchscreen over i2c | partial | weird behavior, I think NHLOS use this, such as BIOS configuration |
+| Touchscreen over i2c | partial | see [below](#Touchscreen) |
 | Touchscreen over spi | partial | resolution is low temporarily, it requires algorithm to handle raw frame data |
 | TPM | x | |
 | USB | works | |
@@ -152,11 +152,36 @@ Front sensor can be probed, no camera video.
 The rear sensor can't be detected.
 
 ## Display
-[White](https://github.com/whitelewi1-ctrl/matebook-e-go-linux) got dispcc and dpu issues fixed, display is working now.
-
-gpio(0,1,8,20,24,52,53,...): gpio0 is backlight enable pin, gpioset -c 4 0=1/0, backlight turn on/off, gpio 52. 53, (vddp, vddn), more infomation, check [here](panel-hx83121a-dkms/dsi_pwr_seq.txt).
+Power sequence is not fully taken into account yet, this will increase power consume slightly when suspended.
+gpio(0,1,8,20,24,52,53,...): gpio0 is backlight enable pin, gpioset -c 4 0=1/0, backlight turn on/off, gpio 52. 53, (vsp/avdd, vsn/avee), more infomation, check [here](panel-hx83121a-dkms/dsi_pwr_seq.txt).
 
 **Addition: Some patches are first proposed by [matalama80td3l](https://github.com/matalama80td3l) at [here](https://gitlab.freedesktop.org/drm/msm/-/issues/56). I verified and completed them.**
+
+## Touchscreen
+### insights
+This IC is located at @0x48 @0x49 of i2c4. Their HID interfaces are @0x4f @0x50 respectively.
+We can confirm @0x48 with 0x4f are for touchscreen. @0x49 with @0x50 may be for stylus.
+
+In DSDT. gpio174 is used to determinate the transfer mode. Low will return SPI device as active,
+high will return I2C hid device(@0x4f) as active, only if it is high, these i2c hid interfaces will
+be exposed in i2c4.
+
+In practical, we should set gpio174 before firmware reload(reload will auto trigger internally after TS reset(gpio99),
+display reset(gpio38) may trigger TS reset internally.) After that, set gpio174 to any state is safe.
+
+When the firmware was reloaded and the TS IRQ(gpio175) is triggered,
+if we set gpio174 low previously, we can read raw tx-rx data via SPI;
+if we set gpio174 high previously, we can read HID packets via I2C.
+
+To check:
+- [x] handle HID packets via I2C.
+- [x] read chip id via I2C.
+- [] read raw tx-rx data via I2C.
+- [x] handle raw tx-rx data via SPI.
+- [] read HID packets via SPI.
+
+### hid over i2c
+Intermittent touch when swiping. non-HLOS use this, such as BIOS configuration.
 
 ## FN Lock
 `echo 0/1 > /sys/devices/platform/soc@0/ac0000.geniqup/a9c000.i2c/i2c-15/15-0038/fn_lock` \
