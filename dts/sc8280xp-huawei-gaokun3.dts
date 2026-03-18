@@ -85,6 +85,49 @@
 		};
 */	};
 
+	vreg_avdd_5p5: regulator-avdd-5p5 {
+		compatible = "regulator-fixed";
+
+		regulator-name = "vreg_avdd_5p5";
+		regulator-min-microvolt = <5500000>;
+		regulator-max-microvolt = <5500000>;
+
+		gpio = <&tlmm 52 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&avdd_reg_en>;
+
+		regulator-boot-on;
+	};
+
+	vreg_avee_5p5: regulator-avee-5p5 {
+		compatible = "regulator-fixed";
+
+		regulator-name = "vreg_avee_5p5";
+		regulator-min-microvolt = <5500000>;
+		regulator-max-microvolt = <5500000>;
+
+		gpio = <&tlmm 53 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&avee_reg_en>;
+
+		regulator-boot-on;
+	};
+
+	vreg_hid: regulator-hid {
+		compatible = "regulator-fixed";
+
+		regulator-name = "vreg_hid";
+		gpio = <&tlmm 174 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+
+		pinctrl-0 = <&hid_reg_en>;
+		pinctrl-names = "default";
+	};
+
 	vreg_misc_3p3: regulator-misc-3p3 {
 		compatible = "regulator-fixed";
 
@@ -568,17 +611,32 @@
 
 
 &i2c4 {
-	clock-frequency = <400000>;
+	clock-frequency = <1000000>;
 
 	pinctrl-0 = <&i2c4_default>;
 	pinctrl-names = "default";
 
 	status = "okay";
 
-	/* There are something */
+	touchscreen@4f {
+		compatible = "hid-over-i2c";
+		reg = <0x4f>;
+
+		hid-descr-addr = <0x1>;
+		interrupts-extended = <&tlmm 175 IRQ_TYPE_LEVEL_LOW>;
+		reset-gpios = <&tlmm 99 GPIO_ACTIVE_LOW>;
+
+		panel = <&panel>;
+		post-reset-deassert-delay-ms = <150>;
+
+		vdd-supply = <&vreg_misc_3p3>;
+		vddl-supply = <&vreg_hid>;
+
+		pinctrl-0 = <&ts0_default>;
+		pinctrl-names = "default";
+	};
 };
-
-
+/*
 &spi6 {
 	pinctrl-0 = <&spi6_default>;
 	pinctrl-names = "default";
@@ -586,10 +644,10 @@
 	status = "okay";
 
 	touchscreen@0 {
-		compatible = "himax,hx83121a";
+		compatible = "himax,hx83121a-ts";
 		reg = <0>;
 
-		/* TODO: power supply, always on rencently */
+		// TODO: power supply, always on rencently
 		interrupts-extended = <&tlmm 175 IRQ_TYPE_LEVEL_LOW>;
 		reset-gpios = <&tlmm 99 GPIO_ACTIVE_LOW>;
 
@@ -605,7 +663,7 @@
 		pinctrl-names = "default";
 	};
 };
-
+*/
 &i2c15 {
 	clock-frequency = <400000>;
 
@@ -729,8 +787,8 @@
 
 	status = "okay";
 
-	panel@0 {
-		compatible = "csot,ppc357db1-4";
+	panel: panel@0 {
+		compatible = "csot,ppc357db1-4", "himax,hx83121a";
 		reg = <0>;
 
 		pinctrl-0 = <&disp_reset_n>, <&mdp_vsync_active>;
@@ -739,9 +797,8 @@
 		reset-gpios = <&tlmm 38 GPIO_ACTIVE_LOW>;
 
 		vddi-supply = <&vreg_l2b>;
-		// TODO: add avdd avee, gpio pin 52, 53
-		// avdd-supply = ;
-		// avee-supply = ;
+		avdd-supply = <&vreg_avdd_5p5>;
+		avee-supply = <&vreg_avee_5p5>;
 
 		ports {
 			#address-cells = <1>;
@@ -1377,6 +1434,18 @@
 
 	gpio-reserved-ranges = <70 2>, <74 6>, <83 4>, <125 2>, <128 2>;
 
+	avdd_reg_en: avdd-reg-en-state {
+		pins = "gpio52";
+		function = "gpio";
+		drive-strength = <2>;
+	};
+
+	avee_reg_en: avee-reg-en-state {
+		pins = "gpio53";
+		function = "gpio";
+		drive-strength = <2>;
+	};
+
 	bt_default: bt-default-state {
 		hstp-bt-en-pins {
 			pins = "gpio133";
@@ -1410,6 +1479,13 @@
 	i2c15_default: i2c15-default-state {
 		pins = "gpio36", "gpio37";
 		function = "qup15";
+		drive-strength = <2>;
+		bias-pull-up;
+	};
+
+	hid_reg_en: hid-reg-en-state {
+		pins = "gpio174";
+		function = "gpio";
 		drive-strength = <2>;
 		bias-pull-up;
 	};
@@ -1546,7 +1622,6 @@
 			function = "gpio";
 			drive-strength = <2>;
 			bias-disable;
-			output-high;
 		};
 	};
 
