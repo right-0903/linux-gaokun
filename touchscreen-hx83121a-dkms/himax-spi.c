@@ -116,7 +116,6 @@ struct himax_ts_data {
 	struct spi_device *spi;
 	struct input_dev *input_dev;
 	struct touchscreen_properties props;
-	unsigned long update_time;
 	struct drm_panel_follower panel_follower;
 };
 
@@ -903,11 +902,6 @@ static irqreturn_t himax_ts_thread(int irq, void *data)
 	u16 final_strengths[HIMAX_MAX_TOUCH];
 	int cnt = 0;
 
-	/* Throttle to 8ms to avoid read-tearing loops but allow native 120Hz (8.33ms) polling */
-	if (time_before(jiffies, ts->update_time + msecs_to_jiffies(8))) {
-		return IRQ_HANDLED;
-	}
-
 	if (hx83121a_gaokun_read_event_stack(ts)) {
 		dev_err(ts->dev, "failed to get touch data!\n");
 		himax_mcu_ic_reset(ts, true);
@@ -924,7 +918,6 @@ static irqreturn_t himax_ts_thread(int irq, void *data)
 	}
 
 	himax_report_state(ts, pos, final_strengths, cnt);
-	ts->update_time = jiffies;
 	return IRQ_HANDLED;
 }
 
