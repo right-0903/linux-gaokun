@@ -687,7 +687,7 @@ static void dump_frame(u16 *ptr, bool raw)
  * array 2D to 1D 且扩展处理边界外一圈
  * 即不在 tx_max * rx_max 范围内返回 0
  */
-#define ARRACC(arr, tx, rx) le16_to_cpup(arr + tx * HIMAX_MAX_RX + rx)
+#define ARRACC(arr, tx, rx) le16_to_cpup((arr) + (tx) * HIMAX_MAX_RX + (rx))
 static u16 dd2d(u16 *arr, int tx, int rx)
 {
 	return (tx >= 0) & (tx < HIMAX_MAX_TX) & (rx >= 0) & (rx < HIMAX_MAX_RX)
@@ -782,9 +782,9 @@ sort:
 }
 
 /* generate numerator items */
-#define GEN_N(v1, v2, v3, n)	\
-do {				\
-	n = 3 * v3 + v2 - v1;	\
+#define GEN_N(v1, v2, v3, n)		\
+do {					\
+	n = 3 * (v3) + (v2) - (v1);	\
 } while (0)
 
 static int rxtx2xy(u16 *arr, struct input_mt_pos *pos, u16 *strengths_out, int cnt)
