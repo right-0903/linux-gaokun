@@ -117,6 +117,20 @@
 		regulator-boot-on;
 	};
 
+	vreg_dsi_bl: regulator-dsi-bl {
+		compatible = "regulator-fixed";
+
+		regulator-name = "vreg_dsi_bl";
+
+		gpio = <&tlmm 0 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&bl_reg_en>;
+
+		regulator-boot-on;
+	};
+
 	vreg_misc_3p3: regulator-misc-3p3 {
 		compatible = "regulator-fixed";
 
@@ -631,6 +645,10 @@
 		touchscreen-size-x = <2560>;
 		touchscreen-size-y = <1600>;
 
+		/*
+		 * internally handle invert first, two transformations are
+		 * non-comutative even if we can swap first.
+		 */
 		touchscreen-swapped-x-y;
 		touchscreen-inverted-x;
 
@@ -774,6 +792,7 @@
 		vddi-supply = <&vreg_l2b>;
 		avdd-supply = <&vreg_avdd_5p5>;
 		avee-supply = <&vreg_avee_5p5>;
+		bl-supply = <&vreg_dsi_bl>;
 
 		ports {
 			#address-cells = <1>;
@@ -1406,19 +1425,27 @@
 };
 
 &tlmm {
-
 	gpio-reserved-ranges = <70 2>, <74 6>, <83 4>, <125 2>, <128 2>;
 
 	avdd_reg_en: avdd-reg-en-state {
 		pins = "gpio52";
 		function = "gpio";
 		drive-strength = <2>;
+		bias-disable;
 	};
 
 	avee_reg_en: avee-reg-en-state {
 		pins = "gpio53";
 		function = "gpio";
 		drive-strength = <2>;
+		bias-disable;
+	};
+
+	bl_reg_en: bl-reg-en-state {
+		pins = "gpio0";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
 	};
 
 	bt_default: bt-default-state {
@@ -1441,7 +1468,6 @@
 		function = "gpio";
 		drive-strength = <2>;
 		bias-pull-up;
-		output-high;
 	};
 
 	i2c4_default: i2c4-default-state {
