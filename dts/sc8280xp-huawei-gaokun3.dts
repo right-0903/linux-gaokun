@@ -624,6 +624,8 @@
 		interrupts-extended = <&tlmm 175 IRQ_TYPE_LEVEL_LOW>;
 		reset-gpios = <&tlmm 99 GPIO_ACTIVE_LOW>;
 
+		panel = <&panel>;
+
 		spi-max-frequency = <12000000>;
 
 		touchscreen-size-x = <2560>;
