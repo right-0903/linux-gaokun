@@ -817,19 +817,19 @@ static int hx83121a_gaokun_read_event_stack(struct himax_ts_data *ts)
  * too small, fast motion can break tracking and create brief lift/re-touch
  * behavior.
  */
-#define HIMAX_TRACK_MATCH_DIST2	(256 * 256)
+#define HIMAX_TRACK_MATCH_DIST2	(420 * 420)
 /*
  * Number of consecutive frames we keep a slot alive after its peak disappears.
  * Raising this masks short detection dropouts, while lowering it makes slot
  * release more eager.
  */
-#define HIMAX_TRACK_LOST_FRAMES	2
+#define HIMAX_TRACK_LOST_FRAMES	3
 /*
  * Minimum separation in the raw RX/TX grid before two local peaks are treated
  * as distinct touches. Raising this merges nearby fingers more aggressively;
  * lowering it helps close-finger separation but can create duplicates.
  */
-#define HIMAX_TOUCH_SEPARATION_GRID	3
+#define HIMAX_TOUCH_SEPARATION_GRID	2
 static u16 simple_filter(int val)
 {
 	/* 触控区貌似只会大于 EQUILIBRIUM, 如果是稳定的数据, 只会出现 0x8000 和 0x8000+ */
@@ -1008,6 +1008,12 @@ static inline int himax_dist2(const struct input_mt_pos *a,
 	return dx * dx + dy * dy;
 }
 
+struct himax_match_candidate {
+	u8 track_idx;
+	u8 det_idx;
+	int dist2;
+};
+
 static void himax_reset_track(struct himax_track *trk)
 {
 	memset(trk, 0, sizeof(*trk));
@@ -1018,53 +1024,96 @@ static void himax_track_contacts(struct himax_ts_data *ts,
 				 int det_cnt)
 {
 	bool det_used[HIMAX_MAX_TOUCH] = { false };
-	int i, j;
+	bool track_matched[HIMAX_MAX_TOUCH] = { false };
+	struct himax_match_candidate cand[HIMAX_MAX_TOUCH * HIMAX_MAX_TOUCH];
+	int cand_cnt = 0;
+	int i, j, k;
 
+	/*
+	 * Match globally by shortest distance first so close contacts are less
+	 * likely to swap just because a lower-numbered slot was processed first.
+	 */
 	for (i = 0; i < HIMAX_MAX_TOUCH; i++) {
 		struct himax_track *trk = &ts->tracks[i];
-		int best_det = -1;
-		int best_dist2 = INT_MAX;
 
 		if (!trk->active)
 			continue;
 
 		for (j = 0; j < det_cnt; j++) {
-			int d2;
+			int d2 = himax_dist2(&det[j], trk);
 
-			if (det_used[j])
+			if (d2 > HIMAX_TRACK_MATCH_DIST2)
 				continue;
 
-			d2 = himax_dist2(&det[j], trk);
-			if (d2 < best_dist2) {
-				best_dist2 = d2;
-				best_det = j;
-			}
+			cand[cand_cnt].track_idx = i;
+			cand[cand_cnt].det_idx = j;
+			cand[cand_cnt].dist2 = d2;
+			cand_cnt++;
+		}
+	}
+
+	for (i = 0; i < cand_cnt; i++) {
+		int best = i;
+
+		for (j = i + 1; j < cand_cnt; j++) {
+			if (cand[j].dist2 < cand[best].dist2 ||
+			    (cand[j].dist2 == cand[best].dist2 &&
+			     cand[j].track_idx < cand[best].track_idx) ||
+			    (cand[j].dist2 == cand[best].dist2 &&
+			     cand[j].track_idx == cand[best].track_idx &&
+			     cand[j].det_idx < cand[best].det_idx))
+				best = j;
 		}
 
-		if (best_det >= 0 && best_dist2 <= HIMAX_TRACK_MATCH_DIST2) {
-			/* Mild temporal smoothing to reduce noisy point jitter. */
-			trk->x = (trk->x * 3 + det[best_det].x) / 4;
-			trk->y = (trk->y * 3 + det[best_det].y) / 4;
-			trk->missed = 0;
-			if (trk->seen < U8_MAX)
-				trk->seen++;
-			det_used[best_det] = true;
-		} else {
-			/*
-			 * A candidate touch must be observed on consecutive
-			 * frames before it is allowed to start a new contact.
-			 * This drops short idle noise bursts before they can be
-			 * promoted into a reported touch.
-			 */
-			if (!ts->touch_active) {
-				himax_reset_track(trk);
-				continue;
-			}
+		if (best != i)
+			swap(cand[i], cand[best]);
+	}
 
-			trk->missed++;
-			if (trk->missed > HIMAX_TRACK_LOST_FRAMES)
-				himax_reset_track(trk);
+	for (k = 0; k < cand_cnt; k++) {
+		struct himax_match_candidate *match = &cand[k];
+		struct himax_track *trk;
+
+		if (track_matched[match->track_idx] || det_used[match->det_idx])
+			continue;
+
+		trk = &ts->tracks[match->track_idx];
+		if (!trk->active)
+			continue;
+
+		/* Mild temporal smoothing to reduce noisy point jitter. */
+		trk->x = (trk->x * 3 + det[match->det_idx].x) / 4;
+		trk->y = (trk->y * 3 + det[match->det_idx].y) / 4;
+		trk->missed = 0;
+		if (trk->seen < U8_MAX)
+			trk->seen++;
+
+		track_matched[match->track_idx] = true;
+		det_used[match->det_idx] = true;
+	}
+
+	for (i = 0; i < HIMAX_MAX_TOUCH; i++) {
+		struct himax_track *trk = &ts->tracks[i];
+
+		if (!trk->active)
+			continue;
+
+		if (track_matched[i])
+			continue;
+
+		/*
+		 * A candidate touch must be observed on consecutive
+		 * frames before it is allowed to start a new contact.
+		 * This drops short idle noise bursts before they can be
+		 * promoted into a reported touch.
+		 */
+		if (!ts->touch_active) {
+			himax_reset_track(trk);
+			continue;
 		}
+
+		trk->missed++;
+		if (trk->missed > HIMAX_TRACK_LOST_FRAMES)
+			himax_reset_track(trk);
 	}
 
 	for (j = 0; j < det_cnt; j++) {
