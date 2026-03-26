@@ -811,9 +811,25 @@ static int hx83121a_gaokun_read_event_stack(struct himax_ts_data *ts)
 #define HIMAX_PEAK_QUALITY_MIN	0x300
 #define HIMAX_TOUCH_START_DEBOUNCE	2
 #define HIMAX_NEW_TOUCH_DEBOUNCE	2
-#define HIMAX_TRACK_MATCH_DIST2	(420 * 420)
+/*
+ * Maximum squared XY distance allowed when matching a new detection to an
+ * existing slot. A smaller value reduces close-finger slot swaps, but if it is
+ * too small, fast motion can break tracking and create brief lift/re-touch
+ * behavior.
+ */
+#define HIMAX_TRACK_MATCH_DIST2	(256 * 256)
+/*
+ * Number of consecutive frames we keep a slot alive after its peak disappears.
+ * Raising this masks short detection dropouts, while lowering it makes slot
+ * release more eager.
+ */
 #define HIMAX_TRACK_LOST_FRAMES	2
-#define HIMAX_TOUCH_SEPARATION_GRID	5
+/*
+ * Minimum separation in the raw RX/TX grid before two local peaks are treated
+ * as distinct touches. Raising this merges nearby fingers more aggressively;
+ * lowering it helps close-finger separation but can create duplicates.
+ */
+#define HIMAX_TOUCH_SEPARATION_GRID	3
 static u16 simple_filter(int val)
 {
 	/* 触控区貌似只会大于 EQUILIBRIUM, 如果是稳定的数据, 只会出现 0x8000 和 0x8000+ */
