@@ -15,6 +15,9 @@ IMAGE_SIZE="${IMAGE_SIZE:-6G}"
 ROOTFS_PAD_MIB="${ROOTFS_PAD_MIB:-512}"
 SHRINK_IMAGE="${SHRINK_IMAGE:-1}"
 ZSTD_LEVEL="${ZSTD_LEVEL:-15}"
+GRUB_CMDLINE_LINUX_BASE="${GRUB_CMDLINE_LINUX_BASE:-clk_ignore_unused pd_ignore_unused arm64.nopauth efi=noruntime}"
+GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT:-fbcon=rotate:1 loglevel=3}"
+GRUB_CMDLINE_LINUX_EXTRA="${GRUB_CMDLINE_LINUX_EXTRA:-}"
 
 cleanup() {
     local errexit_was_set=0
@@ -78,6 +81,9 @@ else
 fi
 
 write_grub_cfg() {
+    local linux_cmdline
+    linux_cmdline="$(build_linux_cmdline)"
+
     cat > "${CHROOT_DIR}/boot/grub/grub.cfg" <<EOF
 set default=0
 set timeout=5
@@ -88,10 +94,36 @@ menuentry 'Arch Linux (gaokun3 NVMe)' {
     insmod gzio
     search --no-floppy --fs-uuid --set=root ${ROOT_UUID}
     devicetree /boot/sc8280xp-huawei-gaokun3.dtb
-    linux /boot/vmlinuz-linux-gaokun3 root=UUID=${ROOT_UUID} rw clk_ignore_unused pd_ignore_unused arm64.nopauth iommu.passthrough=0 iommu.strict=0 efi=noruntime modprobe.blacklist=msm loglevel=7 ignore_loglevel initcall_debug
+    linux /boot/vmlinuz-linux-gaokun3 ${linux_cmdline}
     initrd /boot/initramfs-linux-gaokun3.img
 }
 EOF
+}
+
+build_linux_cmdline() {
+    local -a args
+
+    args=("root=UUID=${ROOT_UUID}" "rw")
+
+    append_cmdline_words "${GRUB_CMDLINE_LINUX_BASE}" args
+
+    append_cmdline_words "${GRUB_CMDLINE_LINUX_DEFAULT}" args
+    append_cmdline_words "${GRUB_CMDLINE_LINUX_EXTRA}" args
+
+    printf '%s\n' "${args[*]}"
+}
+
+append_cmdline_words() {
+    local value="$1"
+    local -n target_ref="$2"
+    local -a words
+
+    if [[ -z "${value}" ]]; then
+        return
+    fi
+
+    read -r -a words <<< "${value}"
+    target_ref+=("${words[@]}")
 }
 
 

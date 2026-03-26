@@ -29,6 +29,13 @@ Use mainline with [recommended patches](./patch%20sets/recommended). (My AUR [he
 
 Kernel parameter: `clk_ignore_unused pd_ignore_unused arm64.nopauth efi=noruntime`
 
+Current working GRUB defaults on my MateBook E Go:
+
+```sh
+GRUB_CMDLINE_LINUX_DEFAULT="fbcon=rotate:1 loglevel=3"
+GRUB_CMDLINE_LINUX="clk_ignore_unused pd_ignore_unused arm64.nopauth efi=noruntime"
+```
+
 ## Prebuilt Bianry
 See [release](https://github.com/right-0903/linux-ego/releases/tag/packages).
 
