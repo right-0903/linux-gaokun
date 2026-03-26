@@ -8,6 +8,7 @@ set -euo pipefail
 
 # libarchive-tools for bsdtar, qemu-user-static for emulation
 # parted for partitioning, arch-install-scripts for arch-chroot/genfstab
+# dosfstools for mkfs.fat, e2fsprogs for resize2fs/e2fsck/dumpe2fs
 apt update && apt install -y zstd curl libarchive-tools qemu-user-static parted arch-install-scripts dosfstools e2fsprogs
 
 CHROOT_DIR='alarm-chroot'
@@ -77,24 +78,6 @@ else
     echo ':qemu-aarch64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xb7\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/bin/qemu-aarch64-static:FP' > /proc/sys/fs/binfmt_misc/register
 fi
 
-write_grub_cfg() {
-    cat > "${CHROOT_DIR}/boot/grub/grub.cfg" <<EOF
-set default=0
-set timeout=5
-
-menuentry 'Arch Linux (gaokun3 NVMe)' {
-    insmod part_gpt
-    insmod ext2
-    insmod gzio
-    search --no-floppy --fs-uuid --set=root ${ROOT_UUID}
-    devicetree /boot/sc8280xp-huawei-gaokun3.dtb
-    linux /boot/vmlinuz-linux-gaokun3 root=UUID=${ROOT_UUID} rw clk_ignore_unused pd_ignore_unused arm64.nopauth iommu.passthrough=0 iommu.strict=0 efi=noruntime modprobe.blacklist=msm loglevel=7 ignore_loglevel initcall_debug
-    initrd /boot/initramfs-linux-gaokun3.img
-}
-EOF
-}
-
-
 # Pick a free loop device instead of assuming a fixed one exists.
 LOOP_DEV="$(losetup -f)"
 
@@ -107,7 +90,6 @@ parted ${LOOP_DEV} --script set 1 boot on
 parted ${LOOP_DEV} --script mkpart ALARM ext4 301MiB 100%
 mkfs.fat -F32 ${LOOP_DEV}p1
 mkfs.ext4 ${LOOP_DEV}p2
-ROOT_UUID="$(blkid -s UUID -o value "${LOOP_DEV}p2")"
 
 # mount, extract rootfs and generate a mount table
 mkdir -p ${CHROOT_DIR}
@@ -161,20 +143,17 @@ arch-chroot ${CHROOT_DIR} sh -c 'pacman-key --init && pacman-key --populate arch
 curl https://raw.githubusercontent.com/right-0903/my_arch_auto_pack/refs/heads/main/keys/CA909D46CD1890BE.asc -o ${CHROOT_DIR}/root/CA909D46CD1890BE.asc
 arch-chroot ${CHROOT_DIR} sh -c 'pacman-key --add /root/CA909D46CD1890BE.asc && pacman-key --lsign-key CA909D46CD1890BE'
 
-# Upgrade userland first. Defer the custom kernel until its firmware is in place.
-arch-chroot ${CHROOT_DIR} sh -c 'pacman -Syu efibootmgr grub wireless-regdb iwd btrfs-progs --noconfirm'
-
-# The custom firmware package overlaps with upstream qcom/atheros firmware files.
+# Remove the stock kernel and bundled firmware first so the expensive hooks
+# only run once for the final gaokun3 package set.
+arch-chroot ${CHROOT_DIR} sh -c 'pacman -Rdd --noconfirm linux-aarch64 || true'
+arch-chroot ${CHROOT_DIR} sh -c 'pacman -Rdd --noconfirm linux-aarch64-headers || true'
+arch-chroot ${CHROOT_DIR} sh -c 'pacman -Rdd --noconfirm linux-firmware || true'
 arch-chroot ${CHROOT_DIR} sh -c 'pacman -Rdd --noconfirm linux-firmware-atheros || true'
 arch-chroot ${CHROOT_DIR} sh -c 'pacman -Rdd --noconfirm linux-firmware-qcom || true'
-arch-chroot ${CHROOT_DIR} sh -c 'rm -rf /usr/lib/firmware/ath11k/WCN6855 /usr/lib/firmware/qca /usr/lib/firmware/qcom/a660_gmu.bin /usr/lib/firmware/qcom/a660_sqe.fw'
-arch-chroot ${CHROOT_DIR} sh -c "pacman -S linux-firmware-gaokun3 --noconfirm --overwrite '/usr/lib/firmware/ath11k/WCN6855/*,/usr/lib/firmware/qca/*,/usr/lib/firmware/qcom/a660_*'"
+arch-chroot ${CHROOT_DIR} sh -c 'rm -rf /usr/lib/firmware/*'
 
-# Install the custom kernel only after the device-specific firmware is present.
-arch-chroot ${CHROOT_DIR} sh -c 'pacman -S linux-gaokun3 linux-gaokun3-headers --noconfirm'
-
-# Remove the stock kernel after the replacement is installed successfully.
-arch-chroot ${CHROOT_DIR} sh -c 'pacman -Rdd --noconfirm linux-aarch64 || true'
+# Install final packages in one transaction.
+arch-chroot ${CHROOT_DIR} sh -c 'pacman -Syu efibootmgr grub wireless-regdb iwd btrfs-progs linux-gaokun3 linux-gaokun3-headers linux-firmware-gaokun3 --noconfirm'
 
 # make a copy for this repo
 shopt -s nullglob
@@ -185,23 +164,18 @@ fi
 shopt -u nullglob
 rm -f ${CHROOT_DIR}/var/cache/pacman/pkg/*
 
-# use early KMS for debugging, this would give us log in the initramfs stage.
-if [[ -f ${CHROOT_DIR}/etc/mkinitcpio-gaokun3.conf ]]; then
-    sed -i 's/^\(MODULES=(\)/\1\nsimpledrm\nphy-qcom-snps-femto-v2/' ${CHROOT_DIR}/etc/mkinitcpio-gaokun3.conf
-elif [[ -f ${CHROOT_DIR}/etc/mkinitcpio.conf ]]; then
-    sed -i 's/^\(MODULES=(\)/\1\nsimpledrm\nphy-qcom-snps-femto-v2/' ${CHROOT_DIR}/etc/mkinitcpio.conf
-fi
-arch-chroot ${CHROOT_DIR} sh -c 'mkinitcpio -P'
-
 # install grub
 arch-chroot ${CHROOT_DIR} sh -c 'grub-install --target=arm64-efi --efi-directory=/boot/efi --bootloader-id=arch --no-nvram --recheck'
 
 # fix efi loading
 arch-chroot ${CHROOT_DIR} sh -c 'mkdir -p /boot/efi/EFI/Boot && cp /boot/efi/EFI/arch/grubaa64.efi /boot/efi/EFI/Boot/BOOTAA64.EFI'
 
-# Write the known-good configuration directly instead of relying on generic
-# templates, which may miss the board DTB or load unavailable arm64 modules.
-write_grub_cfg
+# set kernel commandline parameters
+sed -i 's/GRUB_CMDLINE_LINUX=""/GRUB_CMDLINE_LINUX="clk_ignore_unused pd_ignore_unused arm64.nopauth iommu.passthrough=0 iommu.strict=0 pcie_aspm.policy=powersupersave efi=noruntime modprobe.blacklist=msm"/' ${CHROOT_DIR}/etc/default/grub
+sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet"/GRUB_CMDLINE_LINUX_DEFAULT="fbcon=rotate:1 loglevel=3"/' ${CHROOT_DIR}/etc/default/grub
+
+# generate the grub config
+arch-chroot ${CHROOT_DIR} sh -c 'update-grub'
 
 # do clean
 rm -f ${CHROOT_DIR}/usr/bin/qemu-aarch64-static ${CHROOT_DIR}/root/*
