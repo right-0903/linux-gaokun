@@ -11,6 +11,7 @@ This project mainly refers to the following projects:
 * [NewWheat](https://gitlab.com/New-Wheat/linux-for-huawei-matebook-e-2019): yet anoter arm64 EC driver, and help from him.
 * [chenxuecong2](https://github.com/chenxuecong2/linux-huawei-matebook-e-go) & [matalama80td3l](https://github.com/matalama80td3l/matebook-e-go-boot-works): initial device tree for the Huawei Matebook E Go.
 * [White](https://github.com/whitelewi1-ctrl/matebook-e-go-linux): Dispcc and DPU fixes. hid over i2c fixes.
+* [Detach0-0](https://github.com/awarson2233/EGoTouchRev-rebuild/blob/linux/Log/%E5%85%A8%E7%A8%8B.log): Huawei touch driver init sequence.
 
 ## Upstream Progress
 ~Initial dt support will land on 6.14.~(landed)
@@ -19,7 +20,7 @@ This project mainly refers to the following projects:
 
 ~Initial UCSI support will land on 6.16.~(landed)
 
-WIP to make dsi panel land on 7.1
+Dsi panel will land on 7.1
 
 ## Disclaimer
 I am just an amateur, a Linux noob, not educated with formal CS courses. You should never believe what I say below, except this sentence. I am not responsible for your actions; you do this all at your own risk!
@@ -41,7 +42,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | Feature | Status | Note |
 | ------- | ------ | ---- |
 | Audio  | works | see [below](#audio) |
-| Backlight | works | dcs dimming, backlihgt ic should be i2c4 @?? |
+| Backlight | works | dcs dimming, backlihgt ic may be in one i2c bus |
 | Battery | works | For more attributes, check `/sys/class/power_supply/gaokun-ec-battery/*`  |
 | Bluetooth | works | Adding board file for wifi will improve RF performance |
 | Camera | x | |
@@ -52,7 +53,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | EFI variables | works | |
 | Fingerprint reader | x | FTE7001, gpio185 |
 | GPU | works | Freedreno 690([FD690](./feature_spoliers/gpu.png)), `vulkan-freedreno` for vulkan support. |
-| Hibernation | x | |
+| Hibernation | untested | |
 | Keyboard & Touchpad | works | |
 | Keyboard fn keys | partial | Assistant key(between `F6` and `F7`), WIFI key(`F9`), and Manager key(`F10`), they don't work. |
 | Lid | works |  |
@@ -70,7 +71,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | USB-PD | works | fast charging(45W+) supported with UCSI EC driver |
 | USB-C DisplayPort Alt Mode | works | it may be broken nowadays (untested since ~6.14) |
 | Video acceleration | untested | see [below](#Video-acceleration) |
-| Virtualisation | x | |
+| Virtualisation | untested | see [here](https://github.com/TravMurav/slbounce) |
 | Volumn keys | works | |
 | Watchdog | partial | One in sc8280xp works, another in EC not |
 | Wi-Fi | works | see [below](#Wi-Fi) |
