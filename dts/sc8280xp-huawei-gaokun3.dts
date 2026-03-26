@@ -33,6 +33,22 @@
 		serial0 = &uart2;
 	};
 
+	/* use it as a fallback */
+        chosen {
+                #address-cells = <2>;
+                #size-cells = <2>;
+                ranges;
+
+                framebuffer0: framebuffer@c6200000 {
+                        compatible = "simple-framebuffer";
+                        reg = <0x0 0xc6200000 0x0 (2560 * 1600 * 4)>;
+                        width = <1600>;
+                        height = <2560>;
+                        stride = <(1600 * 4)>;
+                        format = "a8r8g8b8";
+                };
+        };
+
 	wcd938x: audio-codec {
 		compatible = "qcom,wcd9380-codec";
 
