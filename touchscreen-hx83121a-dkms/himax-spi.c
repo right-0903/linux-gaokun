@@ -16,6 +16,7 @@
 #include <linux/input/mt.h>
 #include <linux/input/touchscreen.h>
 #include <linux/interrupt.h>
+#include <linux/limits.h>
 #include <linux/module.h>
 #include <linux/spi/spi.h>
 #include <linux/math.h>
@@ -29,6 +30,7 @@
 #define HIMAX_REG_SZ					4U
 #define HIMAX_MAX_RX					60U
 #define HIMAX_MAX_TX					40U
+#define HIMAX_MAX_TOUCH				10
 #define HIMAX_HX83121A_SAFE_MODE_PASSWORD		0x9527
 /* FIXME: this is for hx83120j */
 #define HIMAX_HX83121A_STACK_SIZE			128U
@@ -100,8 +102,10 @@ union himax_dword_data {
 
 struct himax_ts_data {
 	u8 *xfer_buf;
+	u8 *event_buf;
 	u32 spi_xfer_max_sz;
 	u32 xfer_buf_sz;
+	u32 event_buf_sz;
 	/* lock for irq_save */
 	spinlock_t irq_lock;
 	bool irq_enabled;
@@ -110,7 +114,15 @@ struct himax_ts_data {
 	struct spi_device *spi;
 	struct input_dev *input_dev;
 	struct touchscreen_properties props;
-	unsigned long update_time;
+	u8 touch_start_frames;
+	bool touch_active;
+	struct himax_track {
+		bool active;
+		u8 seen;
+		u8 missed;
+		s32 x;
+		s32 y;
+	} tracks[HIMAX_MAX_TOUCH];
 };
 
 /*
@@ -150,7 +162,8 @@ static int himax_spi_read(struct himax_ts_data *ts, u8 cmd, u8 *buf, u32 len)
 	if (ret < 0)
 		return ret;
 
-	memcpy(buf, ts->xfer_buf + HIMAX_BUS_R_HLEN, len);
+	/* Destination may alias xfer_buf when caller reuses driver buffers. */
+	memmove(buf, ts->xfer_buf + HIMAX_BUS_R_HLEN, len);
 	return 0;
 }
 
@@ -546,7 +559,6 @@ static int hx83121a_chip_detect(struct himax_ts_data *ts)
 
 /* -------------------------------------------------------------------------- */
 /* input 子系统 */
-#define HIMAX_MAX_TOUCH 10
 static int himax_input_dev_config(struct himax_ts_data *ts)
 {
 	struct input_dev *input_dev;
@@ -583,26 +595,6 @@ static int himax_input_dev_config(struct himax_ts_data *ts)
 	return 0;
 }
 
-static void himax_report_state(struct himax_ts_data *ts,
-			       struct input_mt_pos *pos,
-			       int touch_num)
-{
-	int i, slots[HIMAX_MAX_TOUCH];
-
-	input_mt_assign_slots(ts->input_dev, slots, pos, touch_num, 0);
-	for (i = 0; i < touch_num; i++) {
-		input_mt_slot(ts->input_dev, slots[i]);
-		input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER, true);
-
-		touchscreen_report_pos(ts->input_dev, &ts->props,
-				       pos[i].x, pos[i].y, true);
-		// input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, );
-	}
-
-	input_mt_sync_frame(ts->input_dev);
-	input_sync(ts->input_dev);
-}
-
 /* -------------------------------------------------------------------------- */
 /* 中断处理 */
 
@@ -611,9 +603,9 @@ static int hx83121a_gaokun_read_event_stack(struct himax_ts_data *ts)
 	u32 i;
 	int ret;
 	const u32 max_trunk_sz = ts->spi_xfer_max_sz - HIMAX_BUS_R_HLEN;
-	u8 *buf = ts->xfer_buf;
+	u8 *buf = ts->event_buf;
 
-	memset(ts->xfer_buf, 0x00, ts->xfer_buf_sz);
+	memset(ts->event_buf, 0x00, ts->event_buf_sz);
 	size_t length = HIMAX_HX83121A_FULL_STACK_SZ; /* FIXME: use actual size. */
 
 	for (i = 0; i < length; i += max_trunk_sz) {
@@ -630,6 +622,13 @@ static int hx83121a_gaokun_read_event_stack(struct himax_ts_data *ts)
 
 #define EQUILIBRIUM	0x8000
 #define THRESHOLD	0xa0 /* casual, 拉高有助于防止乱跳, 代价是灵敏度降低 */
+#define HIMAX_PEAK_MIN	0x160
+#define HIMAX_PEAK_QUALITY_MIN	0x300
+#define HIMAX_TOUCH_START_DEBOUNCE	2
+#define HIMAX_NEW_TOUCH_DEBOUNCE	2
+#define HIMAX_TRACK_MATCH_DIST2	(420 * 420)
+#define HIMAX_TRACK_LOST_FRAMES	2
+#define HIMAX_TOUCH_SEPARATION_GRID	5
 static u16 simple_filter(int val)
 {
 	/* 触控区貌似只会大于 EQUILIBRIUM, 如果是稳定的数据, 只会出现 0x8000 和 0x8000+ */
@@ -638,8 +637,12 @@ static u16 simple_filter(int val)
 }
 
 /* TODO: 可以创建一个 sysfs 用于和用户空间 IO, 分析, 处理, 数据 等等 */
-static void dump_frame(u16 *ptr, bool raw)
+static void __maybe_unused dump_frame(u16 *ptr, bool raw)
 {
+	/* Debug helper kept for bring-up and signal quality checks. */
+	if (!IS_ENABLED(CONFIG_DYNAMIC_DEBUG))
+		return;
+
 	char buf[1024];
 
 	pr_warn("Frame start\n");
@@ -664,61 +667,104 @@ static inline u16 dd2d(u16 *arr, int tx, int rx)
 	       ? simple_filter(le16_to_cpup(arr + tx * HIMAX_MAX_RX + rx)) : 0;
 }
 
-#define DIS(pos0, pos1) \
-( abs(pos0->x - pos1->x) + abs(pos0->y - pos1->y) )
-
-#define REPLACE(dst, src) \
-*dst = *src;
-
-static bool is_new_point(u16 *arr, struct input_mt_pos *pos, int cnt)
+static bool is_local_peak(u16 *arr, int tx, int rx)
 {
-	struct input_mt_pos *pos0 = pos + cnt;
-	u16 val = dd2d(arr, pos0->y, pos0->x);
-	struct input_mt_pos *posi;
-	int i;
+	u16 vc = dd2d(arr, tx, rx);
+	u16 vl, vr, vu, vd;
+	u16 quality;
 
-	if (!val)
+	if (vc < HIMAX_PEAK_MIN)
 		return false;
 
-	/* 检查 pos0 周围有没有点, 有的话保留 rawdata 更大那一个 */
-	for (i = cnt - 1; i >= 0; --i) {
-		posi = pos + i;
+	vl = dd2d(arr, tx, rx - 1);
+	vr = dd2d(arr, tx, rx + 1);
+	vu = dd2d(arr, tx - 1, rx);
+	vd = dd2d(arr, tx + 1, rx);
 
-		/* 存在之前记录的点与 '新点' 过于接近, 二选一, 保留 rawdata 更大的那个 */
-		if (DIS(pos0, posi) < 3) {
-			if (val > dd2d(arr, posi->y, posi->x))
-				REPLACE(posi, pos0); // TODO: 处理替换后与其他点距离小于3的情况?
-			return false;
-		}
-	}
+	if (vc < vl || vc < vr || vc < vu || vc < vd)
+		return false;
 
-	/*
-	 * 与所有点都距离大于 2, 是新点, 该点早已被插入, 只要标记 true 返回即可
-	 * cnt == 0 时也会直接 true
-	 */
+	/* Flat areas are usually baseline noise, not a finger peak. */
+	if (vc == vl && vc == vr && vc == vu && vc == vd)
+		return false;
+
+	quality = vc + max(vl, vr) + max(vu, vd);
+	if (quality < HIMAX_PEAK_QUALITY_MIN)
+		return false;
+
+	/* Keep only local maxima to avoid one finger expanding into many points. */
 	return true;
 }
 
 #define OFST 4
+static bool himax_far_enough(const struct input_mt_pos *a,
+			     const struct input_mt_pos *b,
+			     int min_delta)
+{
+	int dx = abs(a->x - b->x);
+	int dy = abs(a->y - b->y);
+
+	return dx >= min_delta || dy >= min_delta;
+}
+
 static void raw2rxtx(u16 *arr, int tx_max, int rx_max,
 		     struct input_mt_pos *pos, int *cnt)
 {
-	int i, j;
+	int i, j, k;
+	int near_idx;
+	int weakest_idx;
+	u16 strength[HIMAX_MAX_TOUCH] = {0};
+	u16 val;
 
 	*cnt = 0;
-	for (i = 0; i < tx_max; ++i)
-		for (j = 0; j < rx_max; ++j){
-			if (*cnt >= HIMAX_MAX_TOUCH) {
-				dump_frame((void *)arr - OFST, true);
-				pr_warn("%s: more then 10 contact points\n", __func__);
-				break;
+	for (i = 0; i < tx_max; ++i) {
+		for (j = 0; j < rx_max; ++j) {
+			struct input_mt_pos cand = {
+				.x = j,
+				.y = i,
+			};
+
+			if (!is_local_peak(arr, i, j))
+				continue;
+
+			val = dd2d(arr, i, j);
+			near_idx = -1;
+			for (k = 0; k < *cnt; k++) {
+				if (!himax_far_enough(&cand, &pos[k], HIMAX_TOUCH_SEPARATION_GRID)) {
+					near_idx = k;
+					break;
+				}
 			}
 
-			/* 水平方向为 rx, 垂直为 tx */
-			pos[*cnt].x = j;
-			pos[*cnt].y = i;
-			*cnt += is_new_point(arr, pos, *cnt);
+			/* Keep strongest one in a small neighborhood to avoid ghost duplicates. */
+			if (near_idx >= 0) {
+				if (val > strength[near_idx]) {
+					strength[near_idx] = val;
+					pos[near_idx] = cand;
+				}
+				continue;
+			}
+
+			if (*cnt < HIMAX_MAX_TOUCH) {
+				pos[*cnt] = cand;
+				strength[*cnt] = val;
+				(*cnt)++;
+				continue;
+			}
+
+			/* Replace the weakest tracked peak if current one is stronger. */
+			weakest_idx = 0;
+			for (k = 1; k < HIMAX_MAX_TOUCH; k++) {
+				if (strength[k] < strength[weakest_idx])
+					weakest_idx = k;
+			}
+
+			if (val > strength[weakest_idx]) {
+				strength[weakest_idx] = val;
+				pos[weakest_idx] = cand;
+			}
 		}
+	}
 }
 
 static void rxtx2xy(u16 *arr, struct input_mt_pos *pos, int cnt)
@@ -752,22 +798,123 @@ static void rxtx2xy(u16 *arr, struct input_mt_pos *pos, int cnt)
 	}
 }
 
+static inline int himax_dist2(const struct input_mt_pos *a,
+			      const struct himax_track *b)
+{
+	s32 dx = a->x - b->x;
+	s32 dy = a->y - b->y;
+
+	return dx * dx + dy * dy;
+}
+
+static void himax_track_contacts(struct himax_ts_data *ts,
+				 struct input_mt_pos *det,
+				 int det_cnt)
+{
+	bool det_used[HIMAX_MAX_TOUCH] = { false };
+	int i, j;
+
+	for (i = 0; i < HIMAX_MAX_TOUCH; i++) {
+		struct himax_track *trk = &ts->tracks[i];
+		int best_det = -1;
+		int best_dist2 = INT_MAX;
+
+		if (!trk->active)
+			continue;
+
+		for (j = 0; j < det_cnt; j++) {
+			int d2;
+
+			if (det_used[j])
+				continue;
+
+			d2 = himax_dist2(&det[j], trk);
+			if (d2 < best_dist2) {
+				best_dist2 = d2;
+				best_det = j;
+			}
+		}
+
+		if (best_det >= 0 && best_dist2 <= HIMAX_TRACK_MATCH_DIST2) {
+			/* Mild temporal smoothing to reduce noisy point jitter. */
+			trk->x = (trk->x * 3 + det[best_det].x) / 4;
+			trk->y = (trk->y * 3 + det[best_det].y) / 4;
+			trk->missed = 0;
+			if (trk->seen < U8_MAX)
+				trk->seen++;
+			det_used[best_det] = true;
+		} else {
+			trk->missed++;
+			if (trk->missed > HIMAX_TRACK_LOST_FRAMES)
+				trk->active = false;
+		}
+	}
+
+	for (j = 0; j < det_cnt; j++) {
+		struct himax_track *trk = NULL;
+
+		if (det_used[j])
+			continue;
+
+		for (i = 0; i < HIMAX_MAX_TOUCH; i++) {
+			if (!ts->tracks[i].active) {
+				trk = &ts->tracks[i];
+				break;
+			}
+		}
+		if (!trk)
+			continue;
+
+		trk->active = true;
+		trk->seen = 1;
+		trk->missed = 0;
+		trk->x = det[j].x;
+		trk->y = det[j].y;
+	}
+}
+
+static int himax_count_stable_tracks(struct himax_ts_data *ts)
+{
+	int i;
+	int cnt = 0;
+
+	for (i = 0; i < HIMAX_MAX_TOUCH; i++) {
+		if (ts->tracks[i].active && ts->tracks[i].seen >= HIMAX_NEW_TOUCH_DEBOUNCE)
+			cnt++;
+	}
+
+	return cnt;
+}
+
+static void himax_report_tracked_state(struct himax_ts_data *ts, bool report_on)
+{
+	int i;
+
+	for (i = 0; i < HIMAX_MAX_TOUCH; i++) {
+		bool on = report_on && ts->tracks[i].active &&
+			  ts->tracks[i].seen >= HIMAX_NEW_TOUCH_DEBOUNCE;
+
+		input_mt_slot(ts->input_dev, i);
+		input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER, on);
+		if (!on)
+			continue;
+
+		touchscreen_report_pos(ts->input_dev, &ts->props,
+				       ts->tracks[i].x, ts->tracks[i].y, true);
+	}
+
+	input_mt_sync_frame(ts->input_dev);
+	input_sync(ts->input_dev);
+}
+
 static irqreturn_t himax_ts_thread(int irq, void *data)
 {
 	struct himax_ts_data *ts = data;
-	u16 *ptr = (void *)ts->xfer_buf + OFST;
+	u16 *ptr = (u16 *)(ts->event_buf + OFST);
 	struct input_mt_pos pos[HIMAX_MAX_TOUCH];
 	int cnt;
-
-	/*
-	 * 指定 若干毫秒 最多触发1次, 调试用可设置为 500, 1000 减少日志刷屏, 但必要时保持
-	 * 手指触摸以避免漏掉数据. 至少请设置为 10, 100hz 较为接近实际刷新率, 不设置会发生
-	 * 数据错误.
-	 */
-	if (time_before(jiffies, ts->update_time + msecs_to_jiffies(20))) {
-		drop_cnt++;
-		return IRQ_HANDLED;
-	}
+	int stable_cnt;
+	bool report_on = true;
 
 	if (hx83121a_gaokun_read_event_stack(ts)) {
 		dev_err(ts->dev, "failed to get touch data!\n");
@@ -785,15 +932,30 @@ static irqreturn_t himax_ts_thread(int irq, void *data)
 	}
 
 	rxtx2xy(ptr, pos, cnt);
+	himax_track_contacts(ts, pos, cnt);
+	stable_cnt = himax_count_stable_tracks(ts);
+
 	/* Not final results, touchscreen_report_pos will handle this (x-y swap, y invert) */
-	for (int i = 0; i < cnt; ++i) {
-		dev_dbg(ts->dev, "x-y %d: %d, %d\n", i, pos[i].x, pos[i].y);
+	for (int i = 0; i < HIMAX_MAX_TOUCH; ++i) {
+		if (!(ts->tracks[i].active && ts->tracks[i].seen >= HIMAX_NEW_TOUCH_DEBOUNCE))
+			continue;
+		dev_dbg(ts->dev, "slot %d x-y: %d, %d\n", i,
+			ts->tracks[i].x, ts->tracks[i].y);
+	}
+
+	if (stable_cnt > 0 && !ts->touch_active) {
+		ts->touch_start_frames++;
+		if (ts->touch_start_frames < HIMAX_TOUCH_START_DEBOUNCE)
+			report_on = false;
+		else
+			ts->touch_active = true;
+	} else if (stable_cnt == 0) {
+		ts->touch_start_frames = 0;
+		ts->touch_active = false;
 	}
 
 	/* 这里报告给系统的坐标数据可以通过 evtest 查看 */
-	himax_report_state(ts, pos, cnt);
-
-	ts->update_time = jiffies;
+	himax_report_tracked_state(ts, report_on);
 
 	return IRQ_HANDLED;
 }
@@ -908,7 +1070,7 @@ static int himax_mcu_power_on_init(struct himax_ts_data *ts)
 		return -EINVAL;
 	}
 
-	/* RawOut select set, must be 0xf6, fuck you huawei */
+	/* RawOut select for this panel configuration. */
 	data.dword = cpu_to_le32(0xf6);
 	ret = himax_mcu_register_write(ts, HIMAX_HX83121A_DSRAM_ADDR_RAW_OUT_SEL, data.byte, 4);
 	if (ret < 0) {
@@ -1007,8 +1169,13 @@ static int himax_spi_probe(struct spi_device *spi)
 	ts->spi = spi;
 	ts->spi_xfer_max_sz = HIMAX_HX83121A_FULL_STACK_SZ;
 	ts->xfer_buf_sz = ts->spi_xfer_max_sz;
+	ts->event_buf_sz = HIMAX_HX83121A_FULL_STACK_SZ;
 	ts->xfer_buf = devm_kzalloc(ts->dev, ts->xfer_buf_sz, GFP_KERNEL);
 	if (!ts->xfer_buf)
+		return -ENOMEM;
+
+	ts->event_buf = devm_kzalloc(ts->dev, ts->event_buf_sz, GFP_KERNEL);
+	if (!ts->event_buf)
 		return -ENOMEM;
 
 	spin_lock_init(&ts->irq_lock);
@@ -1071,3 +1238,5 @@ static struct spi_driver himax_spi_driver = {
 module_spi_driver(himax_spi_driver);
 
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Pengyu Luo <mitltlatltl@gmail.com>");
+MODULE_DESCRIPTION("Himax HX83121A SPI touchscreen driver");
