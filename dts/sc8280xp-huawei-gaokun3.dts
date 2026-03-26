@@ -609,7 +609,7 @@
 	};
 };
 
-
+/*
 &i2c4 {
 	clock-frequency = <1000000>;
 
@@ -636,7 +636,7 @@
 		pinctrl-names = "default";
 	};
 };
-/*
+*/
 &spi6 {
 	pinctrl-0 = <&spi6_default>;
 	pinctrl-names = "default";
@@ -650,6 +650,7 @@
 		// TODO: power supply, always on rencently
 		interrupts-extended = <&tlmm 175 IRQ_TYPE_LEVEL_LOW>;
 		reset-gpios = <&tlmm 99 GPIO_ACTIVE_LOW>;
+		panel = <&panel>;
 
 		spi-max-frequency = <12000000>;
 
@@ -663,7 +664,7 @@
 		pinctrl-names = "default";
 	};
 };
-*/
+
 &i2c15 {
 	clock-frequency = <400000>;
 
