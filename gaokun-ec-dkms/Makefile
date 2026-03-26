@@ -4,7 +4,7 @@ MODVER = 1.0
 
 obj-m += $(MODNAME).o
 
-obj-m += gaokun-battery.o \
+obj-m += huawei-gaokun-battery.o \
 	 ucsi_huawei_gaokun.o
 
 
