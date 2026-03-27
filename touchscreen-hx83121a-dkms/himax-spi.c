@@ -776,7 +776,6 @@ static int himax_wait_for_panel(struct device *dev)
 		return ret;
 	}
 
-	drm_panel_put(panel);
 	return 0;
 }
 
