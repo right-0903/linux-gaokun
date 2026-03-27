@@ -806,7 +806,7 @@ static int hx83121a_gaokun_read_event_stack(struct himax_ts_data *ts)
 }
 
 #define EQUILIBRIUM	0x8000
-#define THRESHOLD	0xa0 /* casual, 拉高有助于防止乱跳, 代价是灵敏度降低 */
+#define THRESHOLD	0xb0 /* casual, 拉高有助于防止乱跳, 代价是灵敏度降低 */
 #define HIMAX_PEAK_MIN	0x160
 #define HIMAX_PEAK_QUALITY_MIN	0x300
 #define HIMAX_TOUCH_START_DEBOUNCE	2
