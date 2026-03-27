@@ -116,6 +116,8 @@ struct himax_ts_data {
 	spinlock_t irq_lock;
 	struct mutex op_lock;
 	bool irq_enabled;
+	bool panel_prepared;
+	bool shutting_down;
 	struct gpio_desc *gpiod_rst;
 	struct device *dev;
 	struct spi_device *spi;
@@ -391,6 +393,23 @@ static void himax_int_enable(struct himax_ts_data *ts, bool enable)
 	spin_unlock_irqrestore(&ts->irq_lock, flags);
 }
 
+static void himax_quiesce_irq(struct himax_ts_data *ts)
+{
+	himax_int_enable(ts, false);
+	synchronize_irq(ts->spi->irq);
+}
+
+static void himax_lock(struct himax_ts_data *ts)
+{
+	himax_quiesce_irq(ts);
+	mutex_lock(&ts->op_lock);
+}
+
+static void himax_unlock(struct himax_ts_data *ts)
+{
+	mutex_unlock(&ts->op_lock);
+}
+
 static void himax_mcu_ic_reset(struct himax_ts_data *ts, bool int_off)
 {
 	if (int_off)
@@ -625,7 +644,6 @@ static int himax_hw_reinit(struct himax_ts_data *ts, bool check_crc)
 	u32 crc_hw;
 	int ret;
 
-	himax_int_enable(ts, false);
 	himax_release_all_touches(ts);
 
 	ret = hx83121a_chip_detect(ts);
@@ -686,7 +704,6 @@ static int himax_hw_reinit_retry(struct himax_ts_data *ts, bool check_crc,
 
 static void himax_power_down(struct himax_ts_data *ts)
 {
-	himax_int_enable(ts, false);
 	himax_release_all_touches(ts);
 	gpiod_set_value_cansleep(ts->gpiod_rst, 1);
 }
@@ -697,14 +714,20 @@ static int himax_panel_prepared(struct drm_panel_follower *follower)
 						panel_follower);
 	int ret;
 
-	mutex_lock(&ts->op_lock);
+	himax_lock(ts);
+	if (ts->shutting_down) {
+		himax_unlock(ts);
+		return 0;
+	}
+
 	ret = himax_hw_reinit_retry(ts, false,
 				    HIMAX_PANEL_REINIT_RETRIES,
 				    HIMAX_PANEL_REINIT_DELAY_MS,
 				    "panel");
+	ts->panel_prepared = !ret;
 	if (ret)
 		himax_power_down(ts);
-	mutex_unlock(&ts->op_lock);
+	himax_unlock(ts);
 
 	return ret;
 }
@@ -714,9 +737,10 @@ static int himax_panel_unpreparing(struct drm_panel_follower *follower)
 	struct himax_ts_data *ts = container_of(follower, struct himax_ts_data,
 						panel_follower);
 
-	mutex_lock(&ts->op_lock);
+	himax_lock(ts);
+	ts->panel_prepared = false;
 	himax_power_down(ts);
-	mutex_unlock(&ts->op_lock);
+	himax_unlock(ts);
 
 	return 0;
 }
@@ -736,9 +760,20 @@ static ssize_t inplace_reset_store(struct device *dev,
 	if (!do_reset)
 		return count;
 
-	mutex_lock(&ts->op_lock);
+	himax_lock(ts);
+	if (ts->shutting_down) {
+		ret = -ENODEV;
+		goto out_unlock;
+	}
+
+	if (!ts->panel_prepared) {
+		ret = -EHOSTDOWN;
+		goto out_unlock;
+	}
+
 	ret = himax_hw_reinit(ts, false);
-	mutex_unlock(&ts->op_lock);
+out_unlock:
+	himax_unlock(ts);
 	if (ret)
 		return ret;
 
@@ -1501,8 +1536,12 @@ static void himax_spi_remove(struct spi_device *spi)
 {
 	struct himax_ts_data *ts = spi_get_drvdata(spi);
 
+	himax_lock(ts);
+	ts->shutting_down = true;
+	ts->panel_prepared = false;
 	device_remove_file(ts->dev, &dev_attr_inplace_reset);
 	himax_power_down(ts);
+	himax_unlock(ts);
 }
 
 static const struct spi_device_id himax_spi_ids[] = {
