@@ -136,7 +136,7 @@ struct himax_ts_data {
 };
 
 static void himax_report_tracked_state(struct himax_ts_data *ts, bool report_on);
-static int himax_disable_fw_reload(struct himax_ts_data *ts);
+static int himax_disable_fw_reload(struct himax_ts_data *ts, bool disable);
 static int himax_mcu_power_on_init(struct himax_ts_data *ts);
 static int himax_mcu_check_crc(struct himax_ts_data *ts, u32 start_addr,
 			       int reload_length, u32 *crc_result);
@@ -640,7 +640,8 @@ static void himax_release_all_touches(struct himax_ts_data *ts)
 		himax_report_tracked_state(ts, false);
 }
 
-static int himax_hw_reinit(struct himax_ts_data *ts, bool check_crc)
+static int himax_hw_reinit(struct himax_ts_data *ts, bool check_crc,
+			   bool disable_flash_reload)
 {
 	u32 crc_hw;
 	int ret;
@@ -663,9 +664,9 @@ static int himax_hw_reinit(struct himax_ts_data *ts, bool check_crc)
 		}
 	}
 
-	ret = himax_disable_fw_reload(ts);
+	ret = himax_disable_fw_reload(ts, disable_flash_reload);
 	if (ret < 0) {
-		dev_err(ts->dev, "%s: disable FW reload fail\n", __func__);
+		dev_err(ts->dev, "%s: set FW reload policy fail\n", __func__);
 		goto out_enable_irq;
 	}
 
@@ -680,14 +681,14 @@ out_enable_irq:
 }
 
 static int himax_hw_reinit_retry(struct himax_ts_data *ts, bool check_crc,
-				 int retries, unsigned int delay_ms,
-				 const char *reason)
+				 bool disable_flash_reload, int retries,
+				 unsigned int delay_ms, const char *reason)
 {
 	int ret;
 	int attempt;
 
 	for (attempt = 1; attempt <= retries; attempt++) {
-		ret = himax_hw_reinit(ts, check_crc);
+		ret = himax_hw_reinit(ts, check_crc, disable_flash_reload);
 		if (!ret)
 			return 0;
 
@@ -721,7 +722,7 @@ static int himax_panel_prepared(struct drm_panel_follower *follower)
 		return 0;
 	}
 
-	ret = himax_hw_reinit_retry(ts, false,
+	ret = himax_hw_reinit_retry(ts, false, false,
 				    HIMAX_PANEL_REINIT_RETRIES,
 				    HIMAX_PANEL_REINIT_DELAY_MS,
 				    "panel");
@@ -772,7 +773,7 @@ static ssize_t inplace_reset_store(struct device *dev,
 		goto out_unlock;
 	}
 
-	ret = himax_hw_reinit(ts, false);
+	ret = himax_hw_reinit(ts, false, false);
 out_unlock:
 	himax_unlock(ts);
 	if (ret)
@@ -1280,7 +1281,7 @@ static int himax_mcu_assign_sorting_mode(struct himax_ts_data *ts, u8 *tmp_data_
  * Tell FW not to reload data from flash. It needs to be
  * set before FW start running.
  */
-static int himax_disable_fw_reload(struct himax_ts_data *ts)
+static int himax_disable_fw_reload(struct himax_ts_data *ts, bool disable)
 {
 	union himax_dword_data data = {
 		/*
@@ -1289,7 +1290,7 @@ static int himax_disable_fw_reload(struct himax_ts_data *ts)
 		 *            <= 0x5aa5, there has flash, but not reload
 		 *            <= 0x0000, there has flash, and reload
 		 */
-		.dword = cpu_to_le32(0x5aa5) // TODO: handle it for zf
+		.dword = cpu_to_le32(disable ? 0x5aa5 : 0x0000) // TODO: handle it for zf
 	};
 
 	return himax_mcu_register_write(ts, HIMAX_DSRAM_ADDR_FLASH_RELOAD, data.byte, 4);
