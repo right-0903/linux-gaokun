@@ -1,0 +1,60 @@
+From e4162c488ac76e2ab771237f67ac9808be5ea0b5 Mon Sep 17 00:00:00 2001
+From: Konrad Dybcio <konrad.dybcio@linaro.org>
+Date: Fri, 4 Aug 2023 22:09:10 +0200
+Subject: [PATCH] media: venus: hfi_venus: Support only updating certain bits
+ with presets
+
+On some platforms (like SM8350) we're expected to only touch certain bits
+(such as 0 and 4 corresponding to mask 0x11). Add support for doing so.
+
+Signed-off-by: Konrad Dybcio <konrad.dybcio@linaro.org>
+Reviewed-by: Bryan O'Donoghue <bryan.odonoghue@linaro.org>
+Link: https://lore.kernel.org/r/20230731-topic-8280_venus-v1-3-8c8bbe1983a5@linaro.org
+Signed-off-by: Johan Hovold <johan+linaro@kernel.org>
+---
+ drivers/media/platform/qcom/venus/core.h      |  1 +
+ drivers/media/platform/qcom/venus/hfi_venus.c | 15 ++++++++++++---
+ 2 files changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/media/platform/qcom/venus/core.h b/drivers/media/platform/qcom/venus/core.h
+index 7506f5d0f609..f680c74049a0 100644
+--- a/drivers/media/platform/qcom/venus/core.h
++++ b/drivers/media/platform/qcom/venus/core.h
+@@ -40,6 +40,7 @@ struct freq_tbl {
+ struct reg_val {
+ 	u32 reg;
+ 	u32 value;
++	u32 mask;
+ };
+ 
+ struct bw_tbl {
+diff --git a/drivers/media/platform/qcom/venus/hfi_venus.c b/drivers/media/platform/qcom/venus/hfi_venus.c
+index bd82066bb6e7..9f76a4fe5d6f 100644
+--- a/drivers/media/platform/qcom/venus/hfi_venus.c
++++ b/drivers/media/platform/qcom/venus/hfi_venus.c
+@@ -369,10 +369,19 @@ static void venus_set_registers(struct venus_hfi_device *hdev)
+ 	const struct venus_resources *res = hdev->core->res;
+ 	const struct reg_val *tbl = res->reg_tbl;
+ 	unsigned int count = res->reg_tbl_size;
+-	unsigned int i;
++	unsigned int i, val;
++
++	for (i = 0; i < count; i++) {
++		val = tbl[i].value;
+ 
+-	for (i = 0; i < count; i++)
+-		writel(tbl[i].value, hdev->core->base + tbl[i].reg);
++		/* In some cases, we only want to update certain bits */
++		if (tbl[i].mask) {
++			val = readl(hdev->core->base + tbl[i].reg);
++			val = (val & ~tbl[i].mask) | (tbl[i].value & tbl[i].mask);
++		}
++
++		writel(val, hdev->core->base + tbl[i].reg);
++	}
+ }
+ 
+ static void venus_soft_int(struct venus_hfi_device *hdev)
+-- 
+2.43.0
+

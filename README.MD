@@ -70,7 +70,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | USB | works | |
 | USB-PD | works | fast charging(45W+) supported with UCSI EC driver |
 | USB-C DisplayPort Alt Mode | works | it may be broken nowadays (untested since ~6.14) |
-| Video acceleration | untested | see [below](#Video-acceleration) |
+| Video acceleration | works | see [below](#Video-acceleration) |
 | Virtualisation | untested | see [here](https://github.com/TravMurav/slbounce) |
 | Volumn keys | works | |
 | Watchdog | partial | One in sc8280xp works, another in EC not |
@@ -206,7 +206,8 @@ SLPI(Sensor Low Power Island), [more details](https://lore.kernel.org/linux-devi
 [Fastrpc reference](https://github.com/qualcomm/fastrpc).
 
 ## Video acceleration
-The firmware can be loaded. It supports v4l2_m2m, never tested it.
+Hardware video acceleration is supported via the Qualcomm Venus engine using the `v4l2m2m` API. Examples of usage:
+- **mpv**: `mpv --hwdec=v4l2m2m-copy <video>`
 
 ## Wi-Fi
 Use [the script](https://github.com/qca/qca-swiss-army-knife/blob/master/tools/scripts/ath11k/ath11k-bdencoder),
