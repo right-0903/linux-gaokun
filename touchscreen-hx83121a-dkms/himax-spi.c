@@ -20,7 +20,6 @@
 #include <linux/limits.h>
 #include <linux/mutex.h>
 #include <linux/module.h>
-#include <linux/of.h>
 #include <linux/spi/spi.h>
 #include <linux/math.h>
 
@@ -141,7 +140,6 @@ static int himax_disable_fw_reload(struct himax_ts_data *ts);
 static int himax_mcu_power_on_init(struct himax_ts_data *ts);
 static int himax_mcu_check_crc(struct himax_ts_data *ts, u32 start_addr,
 			       int reload_length, u32 *crc_result);
-static int himax_wait_for_panel(struct device *dev);
 
 /*
  * 1st byte is the spi function select, 2nd byte is the command belong to the
@@ -789,33 +787,6 @@ static const struct drm_panel_follower_funcs himax_panel_follower_funcs = {
 	.panel_prepared = himax_panel_prepared,
 	.panel_unpreparing = himax_panel_unpreparing,
 };
-
-static int himax_wait_for_panel(struct device *dev)
-{
-	struct device_node *panel_np;
-	struct drm_panel *panel;
-	int ret;
-
-	panel_np = of_parse_phandle(dev->of_node, "panel", 0);
-	if (!panel_np)
-		return -ENODEV;
-
-	panel = of_drm_find_panel(panel_np);
-	of_node_put(panel_np);
-	if (IS_ERR(panel)) {
-		ret = PTR_ERR(panel);
-		/*
-		 * The panel node exists in DT, but its DRM device can still show
-		 * up after the SPI touchscreen. Treat that as a deferred probe so
-		 * the core retries once the panel driver registers.
-		 */
-		if (ret == -ENODEV)
-			ret = -EPROBE_DEFER;
-		return ret;
-	}
-
-	return 0;
-}
 
 /* -------------------------------------------------------------------------- */
 /* 中断处理 */
@@ -1516,12 +1487,6 @@ static int himax_spi_probe(struct spi_device *spi)
 	if (ret) {
 		dev_err(ts->dev, "failed to create inplace_reset sysfs attribute\n");
 		return ret;
-	}
-
-	ret = himax_wait_for_panel(ts->dev);
-	if (ret) {
-		device_remove_file(ts->dev, &dev_attr_inplace_reset);
-		return dev_err_probe(ts->dev, ret, "panel is not ready yet\n");
 	}
 
 	ts->panel_follower.funcs = &himax_panel_follower_funcs;
