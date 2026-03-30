@@ -152,8 +152,7 @@ Front sensor can be probed, no camera video.
 The rear sensor can't be detected.
 
 ## Display
-Power sequence is not fully taken into account yet, this will increase power consume slightly when suspended.
-gpio(0,1,8,20,24,52,53,...): gpio0 is backlight enable pin, gpioset -c 4 0=1/0, backlight turn on/off, gpio 52. 53, (vsp/avdd, vsn/avee), more infomation, check [here](panel-hx83121a-dkms/dsi_pwr_seq.txt).
+Only core power sequence is taken into account (vddi, avdd/vsp, avee/vsn, bl), for the complete sequence, check [here](panel-hx83121a-dkms/dsi_pwr_seq.txt).
 
 **Addition: Some patches are first proposed by [matalama80td3l](https://github.com/matalama80td3l) at [here](https://gitlab.freedesktop.org/drm/msm/-/issues/56). I verified and completed them.**
 
@@ -176,9 +175,9 @@ if we set gpio174 high previously, we can read HID packets via I2C.
 To check:
 - [x] handle HID packets via I2C.
 - [x] read chip id via I2C.
-- [] read raw tx-rx data via I2C.
+- [ ] read raw tx-rx data via I2C.
 - [x] handle raw tx-rx data via SPI.
-- [] read HID packets via SPI.
+- [ ] read HID packets via SPI.
 
 ### hid over i2c
 Intermittent touch when swiping. non-HLOS use this, such as BIOS configuration.

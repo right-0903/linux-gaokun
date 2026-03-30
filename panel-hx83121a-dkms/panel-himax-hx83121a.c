@@ -23,7 +23,7 @@
 
 #include <video/mipi_display.h>
 
-static bool enable_dsc = false;
+static bool enable_dsc;
 module_param(enable_dsc, bool, 0);
 MODULE_PARM_DESC(enable_dsc, "enable DSC on the panel (default: false)");
 
@@ -62,6 +62,7 @@ static const struct regulator_bulk_data himax_supplies[] = {
 	{ .supply = "vddi" },
 	{ .supply = "avdd" },
 	{ .supply = "avee" },
+	{ .supply = "bl" },
 };
 
 static inline struct himax *to_himax(struct drm_panel *panel)
@@ -118,7 +119,7 @@ static int himax_prepare(struct drm_panel *panel)
 		mipi_dsi_compression_mode_multi(&dsi_ctx, true);
 	}
 
-	return backlight_update_status(ctx->backlight);
+	return backlight_enable(ctx->backlight);
 }
 
 static int himax_off(struct mipi_dsi_multi_context *dsi_ctx)
@@ -150,7 +151,6 @@ static int himax_unprepare(struct drm_panel *panel)
 static int himax_get_modes(struct drm_panel *panel,
 			   struct drm_connector *connector)
 {
-
 	struct himax *ctx = to_himax(panel);
 	const struct panel_desc *desc = ctx->desc;
 	const struct drm_display_mode *modes;
@@ -218,106 +218,6 @@ himax_create_backlight(struct mipi_dsi_device *dsi)
 
 	return devm_backlight_device_register(dev, dev_name(dev), dev, dsi,
 					      &himax_bl_ops, &props);
-}
-
-static int himax_probe(struct mipi_dsi_device *dsi)
-{
-	struct mipi_dsi_device_info dsi_info = {"dsi-secondary", 0, NULL};
-	struct mipi_dsi_host *dsi1_host;
-	struct device *dev = &dsi->dev;
-	const struct panel_desc *desc;
-	struct device_node *dsi1;
-	struct himax *ctx;
-	int num_dsi = 1;
-	int ret, i;
-
-	ctx = devm_kzalloc(dev, sizeof(*ctx), GFP_KERNEL);
-	if (!ctx)
-		return -ENOMEM;
-
-	ret = devm_regulator_bulk_get_const(&dsi->dev,
-					    ARRAY_SIZE(himax_supplies),
-					    himax_supplies, &ctx->supplies);
-	if (ret < 0)
-		return ret;
-
-	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->reset_gpio))
-		return dev_err_probe(dev, PTR_ERR(ctx->reset_gpio),
-				     "Failed to get reset-gpios\n");
-
-	desc = of_device_get_match_data(dev);
-	if (!desc)
-		return -ENODEV;
-	ctx->desc = desc;
-	ctx->dsc = *desc->dsc_cfg;
-
-	if (desc->is_dual_dsi) {
-		num_dsi = 2;
-		dsi1 = of_graph_get_remote_node(dsi->dev.of_node, 1, -1);
-		if (!dsi1) {
-			dev_err(dev, "cannot get secondary DSI node.\n");
-			return -ENODEV;
-		}
-
-		dsi1_host = of_find_mipi_dsi_host_by_node(dsi1);
-		of_node_put(dsi1);
-		if (!dsi1_host)
-			return dev_err_probe(dev, -EPROBE_DEFER,
-					     "cannot get secondary DSI host\n");
-
-		ctx->dsi[1] = devm_mipi_dsi_device_register_full(dev, dsi1_host,
-								 &dsi_info);
-		if (IS_ERR(ctx->dsi[1])) {
-			dev_err(dev, "cannot get secondary DSI device\n");
-			return PTR_ERR(ctx->dsi[1]);
-		}
-
-		mipi_dsi_set_drvdata(ctx->dsi[1], ctx);
-	}
-
-	ctx->dsi[0] = dsi;
-	mipi_dsi_set_drvdata(dsi, ctx);
-
-	drm_panel_init(&ctx->panel, dev, &himax_panel_funcs,
-		       DRM_MODE_CONNECTOR_DSI);
-
-	ctx->panel.prepare_prev_first = true;
-
-	if (desc->has_dcs_backlight) {
-		ctx->backlight = himax_create_backlight(to_primary_dsi(ctx));
-		if (IS_ERR(ctx->backlight))
-			return dev_err_probe(dev, PTR_ERR(ctx->backlight),
-					     "Failed to create backlight\n");
-	} else {
-		ret = drm_panel_of_backlight(&ctx->panel);
-		if (ret)
-			return dev_err_probe(dev, ret, "Failed to get backlight\n");
-	}
-
-	drm_panel_add(&ctx->panel);
-
-	for (i = 0; i < num_dsi; i++) {
-		ctx->dsi[i]->lanes = desc->lanes;
-		ctx->dsi[i]->format = desc->format;
-		ctx->dsi[i]->mode_flags = desc->mode_flags;
-		ctx->dsi[i]->dsc = enable_dsc ? &ctx->dsc : NULL;
-		ret = devm_mipi_dsi_attach(dev, ctx->dsi[i]);
-		if (ret < 0) {
-			drm_panel_remove(&ctx->panel);
-			return dev_err_probe(dev, ret,
-					     "Failed to attach to DSI host\n");
-		}
-	}
-
-	return 0;
-}
-
-static void himax_remove(struct mipi_dsi_device *dsi)
-{
-	struct himax *ctx = mipi_dsi_get_drvdata(dsi);
-
-	drm_panel_remove(&ctx->panel);
 }
 
 static int boe_ppc357db1_4_dsc_init_seq(struct mipi_dsi_multi_context *dsi_ctx)
@@ -683,6 +583,104 @@ static const struct drm_display_mode ppc357db1_4_modes[] = {
 		.vtotal = 2560 + 168 + 4 + 18,
 	},
 };
+
+static int himax_probe(struct mipi_dsi_device *dsi)
+{
+	struct mipi_dsi_device_info dsi_info = {"dsi-secondary", 0, NULL};
+	struct mipi_dsi_host *dsi1_host;
+	struct device *dev = &dsi->dev;
+	const struct panel_desc *desc;
+	struct device_node *dsi1;
+	struct himax *ctx;
+	int num_dsi = 1;
+	int ret, i;
+
+	ctx = devm_drm_panel_alloc(dev, struct himax, panel, &himax_panel_funcs,
+				   DRM_MODE_CONNECTOR_DSI);
+	if (!ctx)
+		return -ENOMEM;
+
+	ret = devm_regulator_bulk_get_const(&dsi->dev,
+					    ARRAY_SIZE(himax_supplies),
+					    himax_supplies, &ctx->supplies);
+	if (ret < 0)
+		return ret;
+
+	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(ctx->reset_gpio))
+		return dev_err_probe(dev, PTR_ERR(ctx->reset_gpio),
+				     "Failed to get reset-gpios\n");
+
+	desc = of_device_get_match_data(dev);
+	if (!desc)
+		return -ENODEV;
+	ctx->desc = desc;
+	ctx->dsc = *desc->dsc_cfg;
+
+	if (desc->is_dual_dsi) {
+		num_dsi = 2;
+		dsi1 = of_graph_get_remote_node(dsi->dev.of_node, 1, -1);
+		if (!dsi1) {
+			dev_err(dev, "cannot get secondary DSI node.\n");
+			return -ENODEV;
+		}
+
+		dsi1_host = of_find_mipi_dsi_host_by_node(dsi1);
+		of_node_put(dsi1);
+		if (!dsi1_host)
+			return dev_err_probe(dev, -EPROBE_DEFER,
+					     "cannot get secondary DSI host\n");
+
+		ctx->dsi[1] = devm_mipi_dsi_device_register_full(dev, dsi1_host,
+								 &dsi_info);
+		if (IS_ERR(ctx->dsi[1])) {
+			dev_err(dev, "cannot get secondary DSI device\n");
+			return PTR_ERR(ctx->dsi[1]);
+		}
+
+		mipi_dsi_set_drvdata(ctx->dsi[1], ctx);
+	}
+
+	ctx->dsi[0] = dsi;
+	mipi_dsi_set_drvdata(dsi, ctx);
+
+	ctx->panel.prepare_prev_first = true;
+
+	if (desc->has_dcs_backlight) {
+		ctx->backlight = himax_create_backlight(to_primary_dsi(ctx));
+		if (IS_ERR(ctx->backlight))
+			return dev_err_probe(dev, PTR_ERR(ctx->backlight),
+					     "Failed to create backlight\n");
+	} else {
+		ret = drm_panel_of_backlight(&ctx->panel);
+		if (ret)
+			return dev_err_probe(dev, ret, "Failed to get backlight\n");
+	}
+
+	drm_panel_add(&ctx->panel);
+
+	for (i = 0; i < num_dsi; i++) {
+		ctx->dsi[i]->lanes = desc->lanes;
+		ctx->dsi[i]->format = desc->format;
+		ctx->dsi[i]->mode_flags = desc->mode_flags;
+		ctx->dsi[i]->dsc = enable_dsc ? &ctx->dsc : NULL;
+		ret = devm_mipi_dsi_attach(dev, ctx->dsi[i]);
+		if (ret < 0) {
+			drm_panel_remove(&ctx->panel);
+			return dev_err_probe(dev, ret,
+					     "Failed to attach to DSI host\n");
+		}
+	}
+
+	return 0;
+}
+
+static void himax_remove(struct mipi_dsi_device *dsi)
+{
+	struct himax *ctx = mipi_dsi_get_drvdata(dsi);
+
+	drm_panel_remove(&ctx->panel);
+}
 
 /* Model name: BOE PPC357DB1-4 */
 static const struct panel_desc boe_ppc357db1_4_desc = {

@@ -57,7 +57,7 @@ new file mode 100644
 index 0000000000..ebe643ba41
 --- /dev/null
 +++ b/drivers/gpu/drm/panel/panel-himax-hx83121a.c
-@@ -0,0 +1,749 @@
+@@ -0,0 +1,750 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Himax HX83121A DriverIC panels driver
@@ -122,6 +122,7 @@ index 0000000000..ebe643ba41
 +	{ .supply = "vddi" },
 +	{ .supply = "avdd" },
 +	{ .supply = "avee" },
++	{ .supply = "bl" },
 +};
 +
 +static inline struct himax *to_himax(struct drm_panel *panel)
