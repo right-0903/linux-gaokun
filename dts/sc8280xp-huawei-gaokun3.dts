@@ -628,7 +628,6 @@
 	};
 };
 
-
 &i2c4 {
 	clock-frequency = <1000000>;
 
@@ -653,7 +652,6 @@
 		// TODO: power supply, always on rencently
 		interrupts-extended = <&tlmm 175 IRQ_TYPE_LEVEL_LOW>;
 		reset-gpios = <&tlmm 99 GPIO_ACTIVE_LOW>;
-
 		panel = <&panel>;
 
 		spi-max-frequency = <12000000>;
