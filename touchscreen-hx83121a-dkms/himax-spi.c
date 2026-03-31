@@ -3,8 +3,6 @@
  * Himax SPI Driver
  * based on Himax hx83102j
  *
- * Only tested it on the 2023 model without screen protector
- *
  * Copyright (C) 2019,2024 Himax Corporation.
  * Copyright (C) 2026 Pengyu Luo <mitltlatltl@gmail.com>
  */
@@ -1116,31 +1114,6 @@ static int himax_spi_panel_follower_resume(struct drm_panel_follower *follower)
 	return 0;
 }
 
-/*
- * Swipe would not work then, must rebind to recover totally?
- * FIXME: when swiping, only up and down touch channel can be active, and refresh frequency seems to be low.
- * normal:
- * [  285.225270] calculate x=2242, y=1262 (rx=52, tx=31, vc=0x8731 (vl=0x82c0, vr=0x83f4, vu=0x845a, vd=0x8655)), (vlu=0x8135, vld=0x82b7, vru=0x8303, vrd=0x81b2
- * [  285.233678] calculate x=2241, y=1262 (rx=52, tx=31, vc=0x8736 (vl=0x82ea, vr=0x83c6, vu=0x8483, vd=0x8652)), (vlu=0x812b, vld=0x82d2, vru=0x82ba, vrd=0x816f*
- * [  285.241273] calculate x=2240, y=1261 (rx=52, tx=31, vc=0x875e (vl=0x8333, vr=0x839e, vu=0x849d, vd=0x860b)), (vlu=0x815d, vld=0x82ef, vru=0x82dd, vrd=0x816a
- * [  285.250356] calculate x=2239, y=1261 (rx=52, tx=31, vc=0x8742 (vl=0x834f, vr=0x835b, vu=0x84ad, vd=0x8609)), (vlu=0x8156, vld=0x82fc, vru=0x82ae, vrd=0x8139
- * [  285.258650] calculate x=2238, y=1261 (rx=52, tx=31, vc=0x8751 (vl=0x8366, vr=0x8307, vu=0x84b9, vd=0x85d9)), (vlu=0x8176, vld=0x82fe, vru=0x8276, vrd=0x8116
- * [  285.266153] calculate x=2237, y=1261 (rx=52, tx=31, vc=0x8765 (vl=0x8353, vr=0x82e0, vu=0x846d, vd=0x85e0)), (vlu=0x8190, vld=0x82fa, vru=0x8252, vrd=0x8104
- * [  285.275304] calculate x=2237, y=1263 (rx=52, tx=31, vc=0x8754 (vl=0x831f, vr=0x82ae, vu=0x8403, vd=0x8594)), (vlu=0x8149, vld=0x82ee, vru=0x81eb, vrd=0x8113
- * [  285.283603] calculate x=2236, y=1262 (rx=52, tx=31, vc=0x876a (vl=0x82ba, vr=0x827c, vu=0x8392, vd=0x8595)), (vlu=0x813d, vld=0x82bb, vru=0x81bb, vrd=0x80f0
- * [  285.291289] calculate x=2236, y=1264 (rx=52, tx=31, vc=0x8742 (vl=0x8296, vr=0x8242, vu=0x82ca, vd=0x85b8)), (vlu=0x8118, vld=0x8276, vru=0x817f, vrd=0x80de
- *
- * resume from suspend
- * [  348.321810] calculate x=2282, y=1376 (rx=53, tx=34, vc=0x8602 (vl=0x7fc8, vr=0x7fed, vu=0x8540, vd=0x83df)), (vlu=0x7fd4, vld=0x7fb1, vru=0x7ffd, vrd=0x7f98*
- * [  348.330091] calculate x=2282, y=1376 (rx=53, tx=34, vc=0x8602 (vl=0x7fc6, vr=0x7fec, vu=0x8540, vd=0x83df)), (vlu=0x7fc9, vld=0x7fc7, vru=0x7fd4, vrd=0x7fb3
- * [  348.338442] calculate x=2282, y=1376 (rx=53, tx=34, vc=0x8602 (vl=0x7fe0, vr=0x7fde, vu=0x8540, vd=0x83df)), (vlu=0x7f8c, vld=0x7fbf, vru=0x7ff0, vrd=0x7fb3
- * [  348.346793] calculate x=2282, y=1376 (rx=53, tx=34, vc=0x8602 (vl=0x7fcb, vr=0x7fdd, vu=0x8540, vd=0x83df)), (vlu=0x7fa9, vld=0x7fcf, vru=0x7fe3, vrd=0x7fa3
- * [  348.355104] calculate x=2282, y=1376 (rx=53, tx=34, vc=0x8602 (vl=0x7ff2, vr=0x8025, vu=0x8540, vd=0x83df)), (vlu=0x7fcd, vld=0x8000, vru=0x8008, vrd=0x7feb
- * [  348.363477] calculate x=2282, y=1376 (rx=53, tx=34, vc=0x8602 (vl=0x7fdc, vr=0x7ff0, vu=0x8540, vd=0x83df)), (vlu=0x7fb5, vld=0x7fb3, vru=0x7fe7, vrd=0x7fb2
- * [  348.371789] calculate x=2282, y=1376 (rx=53, tx=34, vc=0x8602 (vl=0x7ff3, vr=0x7ff0, vu=0x8540, vd=0x83df)), (vlu=0x7fca, vld=0x7fd9, vru=0x8004, vrd=0x8006
- * [  348.380117] calculate x=2282, y=1376 (rx=53, tx=34, vc=0x8602 (vl=0x7fe9, vr=0x8007, vu=0x8540, vd=0x83df)), (vlu=0x7fc4, vld=0x7fe6, vru=0x8005, vrd=0x7fba
- * [  348.388470] calculate x=2282, y=1376 (rx=53, tx=34, vc=0x8602 (vl=0x7fd4, vr=0x8002, vu=0x8540, vd=0x83df)), (vlu=0x7fa3, vld=0x7fa2, vru=0x7ff0, vrd=0x7fa2
- */
 static int himax_spi_panel_follower_suspend(struct drm_panel_follower *follower)
 {
 	struct himax_ts_data *ts = container_of(follower, struct himax_ts_data,

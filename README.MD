@@ -184,6 +184,36 @@ To check:
 Intermittent touch when swiping. non-HLOS use this, such as BIOS configuration.
 
 ### over spi
+#### firmware
+> [!NOTE]
+> There are several ts firmwares, your one may not be supported.
+
+```
+cfg_version display_version: timestamp
+43 08: 20 23 01 10 16 12 15 (boe ?)
+43 09: 20 23 01 10 16 16 29 (csot new ?)
+43 07: 20 23 01 10 16 07 43 (csot)
+
+41 08: 20 22 09 27 19 32 44 (boe ?)
+41 09: 20 22 09 27 19 34 25 (csot new ?)
+41 07: 20 22 09 27 19 30 56 (csot)
+```
+
+To check our ts firmware, do either
+
+check `C:\ProgramData\Huawei\HuaweiTHP\hx_hal_log_*`
+
+or
+
+```bash
+i2ctransfer -y 4 w5@0x48 0x00 0x00 0x15 0x02 0x00
+i2ctransfer -y 4 w2@0x48 0x0c 0x00
+i2ctransfer -y 4 w1@0x48 0x08 r2@0x48
+```
+
+Only `43/41 07` are tested, swiping would not work well on `43 07` when resuming from suspend.
+
+#### algorithm
 Due to the limitation of algorithm, the active windows is only central area $A$.
 
 $$
@@ -193,7 +223,6 @@ $$
 There are several algorithms, check `ts/*` branches.
 
 In brief, `ts/caidj0`: improved multi-touch tracking.
-
 
 ## FN Lock
 `echo 0/1 > /sys/devices/platform/soc@0/ac0000.geniqup/a9c000.i2c/i2c-15/15-0038/fn_lock` \
