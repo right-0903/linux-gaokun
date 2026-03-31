@@ -65,7 +65,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | Suspend | works | s2idle |
 | Thermal sensors | works |  |
 | Touchscreen over i2c | partial | see [below](#Touchscreen) |
-| Touchscreen over spi | partial | resolution is low temporarily, it requires algorithm to handle raw frame data |
+| Touchscreen over spi | partial | see [below](#over-spi) |
 | TPM | x | |
 | USB | works | |
 | USB-PD | works | fast charging(45W+) supported with UCSI EC driver |
@@ -159,7 +159,7 @@ Only core power sequence is taken into account (vddi, avdd/vsp, avee/vsn, bl), f
 
 ## Touchscreen
 ### insights
-This IC is located at @0x48 @0x49 of i2c4. Their HID interfaces are @0x4f @0x50 respectively.
+This cascade IC is located at @0x48 @0x49 of i2c4. Its HID interfaces are @0x4f @0x50 respectively.
 We can confirm @0x48 with 0x4f are for touchscreen. @0x49 with @0x50 may be for stylus.
 
 In DSDT. gpio174 is used to determinate the transfer mode. Low will return SPI device as active,
@@ -182,6 +182,18 @@ To check:
 
 ### hid over i2c
 Intermittent touch when swiping. non-HLOS use this, such as BIOS configuration.
+
+### over spi
+Due to the limitation of algorithm, the active windows is only central area $A$.
+
+$$
+A = \\{ (x, y) | (x, y) \in (20.\dot{3}, 2537.\dot{3}) \times (19, 1579) \\}.
+$$
+
+There are several algorithms, check `ts/*` branches.
+
+In brief, `ts/caidj0`: improved multi-touch tracking.
+
 
 ## FN Lock
 `echo 0/1 > /sys/devices/platform/soc@0/ac0000.geniqup/a9c000.i2c/i2c-15/15-0038/fn_lock` \
