@@ -1,0 +1,81 @@
+From c1c177727b58fbe89b4e0c3844692fc953c5fc75 Mon Sep 17 00:00:00 2001
+From: Konrad Dybcio <konrad.dybcio@linaro.org>
+Date: Fri, 4 Aug 2023 22:09:13 +0200
+Subject: [PATCH] media: venus: core: Add SC8280XP resource struct
+
+Add SC8280XP configuration data and related compatible.
+
+Signed-off-by: Konrad Dybcio <konrad.dybcio@linaro.org>
+Reviewed-by: Bryan O'Donoghue <bryan.odonoghue@linaro.org>
+Link: https://lore.kernel.org/r/20230731-topic-8280_venus-v1-6-8c8bbe1983a5@linaro.org
+[ johan: rebase on 6.9-rc1; convert vcodec_pmdomains ]
+Signed-off-by: Johan Hovold <johan+linaro@kernel.org>
+---
+ drivers/media/platform/qcom/venus/core.c | 44 ++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+
+diff --git a/drivers/media/platform/qcom/venus/core.c b/drivers/media/platform/qcom/venus/core.c
+index 747f13442e93..71872ea8233a 100644
+--- a/drivers/media/platform/qcom/venus/core.c
++++ b/drivers/media/platform/qcom/venus/core.c
+@@ -1127,6 +1127,49 @@ static const struct venus_resources sc7280_res = {
+ 	.enc_nodename = "video-encoder",
+ };
+ 
++static const struct freq_tbl sc8280xp_freq_table[] = {
++	{ 0, 239999999 },
++	{ 0, 338000000 },
++	{ 0, 366000000 },
++	{ 0, 444000000 },
++	{ 0, 533000000 },
++	{ 0, 560000000 },
++};
++
++static const struct venus_resources sc8280xp_res = {
++	.freq_tbl = sc8280xp_freq_table,
++	.freq_tbl_size = ARRAY_SIZE(sc8280xp_freq_table),
++	.reg_tbl = sm8350_reg_preset,
++	.reg_tbl_size = ARRAY_SIZE(sm8350_reg_preset),
++	.bw_tbl_enc = sm8250_bw_table_enc,
++	.bw_tbl_enc_size = ARRAY_SIZE(sm8250_bw_table_enc),
++	.bw_tbl_dec = sm8250_bw_table_dec,
++	.bw_tbl_dec_size = ARRAY_SIZE(sm8250_bw_table_dec),
++	.clks = { "core", "iface" },
++	.clks_num = 2,
++	.resets = { "core" },
++	.resets_num = 1,
++	.vcodec0_clks = { "vcodec0_core" },
++	.vcodec_clks_num = 1,
++	.vcodec_pmdomains = (const char *[]) { "venus", "vcodec0" },
++	.vcodec_pmdomains_num = 2,
++	.opp_pmdomain = (const char *[]) { "mx", NULL },
++	.vcodec_num = 1,
++	.max_load = 7833600, /* 7680x4320@60fps */
++	.hfi_version = HFI_VERSION_6XX,
++	.vpu_version = VPU_VERSION_IRIS2,
++	.num_vpp_pipes = 4,
++	.vmem_id = VIDC_RESOURCE_NONE,
++	.vmem_size = 0,
++	.vmem_addr = 0,
++	.dma_mask = GENMASK(31, 29) - 1,
++	.cp_start = 0,
++	.cp_size = 0x25800000,
++	.cp_nonpixel_start = 0x1000000,
++	.cp_nonpixel_size = 0x24800000,
++	.fwname = "qcom/vpu-2.0/venus.mbn",
++};
++
+ static const struct bw_tbl qcm2290_bw_table_dec[] = {
+ 	{ 352800, 597000, 0, 746000, 0 }, /* 1080p@30 + 720p@30 */
+ 	{ 244800, 413000, 0, 516000, 0 }, /* 1080p@30 */
+@@ -1183,6 +1226,7 @@ static const struct of_device_id venus_dt_match[] = {
+ 	{ .compatible = "qcom,qcm2290-venus", .data = &qcm2290_res },
+ 	{ .compatible = "qcom,sc7180-venus", .data = &sc7180_res },
+ 	{ .compatible = "qcom,sc7280-venus", .data = &sc7280_res },
++	{ .compatible = "qcom,sc8280xp-venus", .data = &sc8280xp_res },
+ 	{ .compatible = "qcom,sdm660-venus", .data = &sdm660_res },
+ 	{ .compatible = "qcom,sdm845-venus", .data = &sdm845_res },
+ 	{ .compatible = "qcom,sdm845-venus-v2", .data = &sdm845_res_v2 },
+-- 
+2.43.0
+

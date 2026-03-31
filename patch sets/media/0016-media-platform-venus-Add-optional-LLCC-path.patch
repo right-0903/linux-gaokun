@@ -1,0 +1,112 @@
+From d88860974de160f4ff8ee92c738b0f08471dff55 Mon Sep 17 00:00:00 2001
+From: Konrad Dybcio <konrad.dybcio@linaro.org>
+Date: Fri, 4 Aug 2023 22:09:11 +0200
+Subject: [PATCH] media: platform: venus: Add optional LLCC path
+
+Some newer SoCs (such as SM8350) have a third interconnect path. Add
+it and make it optional.
+
+Signed-off-by: Konrad Dybcio <konrad.dybcio@linaro.org>
+Link: https://lore.kernel.org/r/20230731-topic-8280_venus-v1-4-8c8bbe1983a5@linaro.org
+Signed-off-by: Johan Hovold <johan+linaro@kernel.org>
+---
+ drivers/media/platform/qcom/venus/core.c      | 19 +++++++++++++++++++
+ drivers/media/platform/qcom/venus/core.h      |  3 +++
+ .../media/platform/qcom/venus/pm_helpers.c    |  3 +++
+ 3 files changed, 25 insertions(+)
+
+diff --git a/drivers/media/platform/qcom/venus/core.c b/drivers/media/platform/qcom/venus/core.c
+index 67b69a3c581f..1f42792f0338 100644
+--- a/drivers/media/platform/qcom/venus/core.c
++++ b/drivers/media/platform/qcom/venus/core.c
+@@ -398,6 +398,15 @@ static int venus_probe(struct platform_device *pdev)
+ 	if (IS_ERR(core->cpucfg_path))
+ 		return PTR_ERR(core->cpucfg_path);
+ 
++	core->llcc_path = devm_of_icc_get(dev, "video-llcc");
++	if (IS_ERR(core->llcc_path)) {
++		/* LLCC path is optional */
++		if (PTR_ERR(core->llcc_path) == -ENODATA)
++			core->llcc_path = NULL;
++		else
++			return PTR_ERR(core->llcc_path);
++	}
++
+ 	core->irq = platform_get_irq(pdev, 0);
+ 	if (core->irq < 0)
+ 		return core->irq;
+@@ -594,12 +603,18 @@ static __maybe_unused int venus_runtime_suspend(struct device *dev)
+ 	if (ret)
+ 		goto err_cpucfg_path;
+ 
++	ret = icc_set_bw(core->llcc_path, 0, 0);
++	if (ret)
++		goto err_llcc_path;
++
+ 	ret = icc_set_bw(core->video_path, 0, 0);
+ 	if (ret)
+ 		goto err_video_path;
+ 
+ 	return ret;
+ 
++err_llcc_path:
++	icc_set_bw(core->video_path, kbps_to_icc(20000), 0);
+ err_video_path:
+ 	icc_set_bw(core->cpucfg_path, kbps_to_icc(1000), 0);
+ err_cpucfg_path:
+@@ -639,6 +654,10 @@ static __maybe_unused int venus_runtime_resume(struct device *dev)
+ 	if (ret)
+ 		return ret;
+ 
++	ret = icc_set_bw(core->llcc_path, kbps_to_icc(20000), 0);
++	if (ret)
++		return ret;
++
+ 	ret = icc_set_bw(core->cpucfg_path, kbps_to_icc(1000), 0);
+ 	if (ret)
+ 		return ret;
+diff --git a/drivers/media/platform/qcom/venus/core.h b/drivers/media/platform/qcom/venus/core.h
+index f680c74049a0..bd89a5d58baf 100644
+--- a/drivers/media/platform/qcom/venus/core.h
++++ b/drivers/media/platform/qcom/venus/core.h
+@@ -73,6 +73,7 @@ struct venus_resources {
+ 	unsigned int bw_tbl_enc_size;
+ 	const struct bw_tbl *bw_tbl_dec;
+ 	unsigned int bw_tbl_dec_size;
++	bool has_llcc_path;
+ 	const struct reg_val *reg_tbl;
+ 	unsigned int reg_tbl_size;
+ 	const struct hfi_ubwc_config *ubwc_conf;
+@@ -145,6 +146,7 @@ struct venus_format {
+  * @vcodec1_clks: an array of vcodec1 struct clk pointers
+  * @video_path: an interconnect handle to video to/from memory path
+  * @cpucfg_path: an interconnect handle to cpu configuration path
++ * @llcc_path: an interconnect handle to video to/from llcc path
+  * @pmdomains:	a pointer to a list of pmdomains
+  * @opp_pmdomain: an OPP power-domain
+  * @resets: an array of reset signals
+@@ -199,6 +201,7 @@ struct venus_core {
+ 	struct clk *vcodec1_clks[VIDC_VCODEC_CLKS_NUM_MAX];
+ 	struct icc_path *video_path;
+ 	struct icc_path *cpucfg_path;
++	struct icc_path *llcc_path;
+ 	struct dev_pm_domain_list *pmdomains;
+ 	struct dev_pm_domain_list *opp_pmdomain;
+ 	struct reset_control *resets[VIDC_RESETS_NUM_MAX];
+diff --git a/drivers/media/platform/qcom/venus/pm_helpers.c b/drivers/media/platform/qcom/venus/pm_helpers.c
+index f0269524ac70..bf9eddf74ee5 100644
+--- a/drivers/media/platform/qcom/venus/pm_helpers.c
++++ b/drivers/media/platform/qcom/venus/pm_helpers.c
+@@ -243,6 +243,9 @@ static int load_scale_bw(struct venus_core *core)
+ 	dev_dbg(core->dev, VDBGL "total: avg_bw: %u, peak_bw: %u\n",
+ 		total_avg, total_peak);
+ 
++	if (core->res->has_llcc_path)
++		icc_set_bw(core->llcc_path, total_avg, total_peak);
++
+ 	return icc_set_bw(core->video_path, total_avg, total_peak);
+ }
+ 
+-- 
+2.43.0
+

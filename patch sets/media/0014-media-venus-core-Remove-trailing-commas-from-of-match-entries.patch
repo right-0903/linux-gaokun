@@ -1,0 +1,53 @@
+From e375d916df946623f751a0611004b9a8c8a72194 Mon Sep 17 00:00:00 2001
+From: Konrad Dybcio <konrad.dybcio@linaro.org>
+Date: Fri, 4 Aug 2023 22:09:09 +0200
+Subject: [PATCH] media: venus: core: Remove trailing commas from of match
+ entries
+
+Even though it has zero effect on functionality, remove them for coherency
+with other drivers.
+
+Signed-off-by: Konrad Dybcio <konrad.dybcio@linaro.org>
+Reviewed-by: Bryan O'Donoghue <bryan.odonoghue@linaro.org>
+Link: https://lore.kernel.org/r/20230731-topic-8280_venus-v1-2-8c8bbe1983a5@linaro.org
+Signed-off-by: Johan Hovold <johan+linaro@kernel.org>
+---
+ drivers/media/platform/qcom/venus/core.c | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/media/platform/qcom/venus/core.c b/drivers/media/platform/qcom/venus/core.c
+index 7e639760c41d..67b69a3c581f 100644
+--- a/drivers/media/platform/qcom/venus/core.c
++++ b/drivers/media/platform/qcom/venus/core.c
+@@ -1120,17 +1120,17 @@ static const struct venus_resources qcm2290_res = {
+ };
+ 
+ static const struct of_device_id venus_dt_match[] = {
+-	{ .compatible = "qcom,msm8916-venus", .data = &msm8916_res, },
+-	{ .compatible = "qcom,msm8996-venus", .data = &msm8996_res, },
+-	{ .compatible = "qcom,msm8998-venus", .data = &msm8998_res, },
+-	{ .compatible = "qcom,qcm2290-venus", .data = &qcm2290_res, },
+-	{ .compatible = "qcom,sc7180-venus", .data = &sc7180_res, },
+-	{ .compatible = "qcom,sc7280-venus", .data = &sc7280_res, },
+-	{ .compatible = "qcom,sdm660-venus", .data = &sdm660_res, },
+-	{ .compatible = "qcom,sdm845-venus", .data = &sdm845_res, },
+-	{ .compatible = "qcom,sdm845-venus-v2", .data = &sdm845_res_v2, },
+-	{ .compatible = "qcom,sm8250-venus", .data = &sm8250_res, },
+-	{ }
++	{ .compatible = "qcom,msm8916-venus", .data = &msm8916_res },
++	{ .compatible = "qcom,msm8996-venus", .data = &msm8996_res },
++	{ .compatible = "qcom,msm8998-venus", .data = &msm8998_res },
++	{ .compatible = "qcom,qcm2290-venus", .data = &qcm2290_res },
++	{ .compatible = "qcom,sc7180-venus", .data = &sc7180_res },
++	{ .compatible = "qcom,sc7280-venus", .data = &sc7280_res },
++	{ .compatible = "qcom,sdm660-venus", .data = &sdm660_res },
++	{ .compatible = "qcom,sdm845-venus", .data = &sdm845_res },
++	{ .compatible = "qcom,sdm845-venus-v2", .data = &sdm845_res_v2 },
++	{ .compatible = "qcom,sm8250-venus", .data = &sm8250_res },
++	{}
+ };
+ MODULE_DEVICE_TABLE(of, venus_dt_match);
+ 
+-- 
+2.43.0
+
