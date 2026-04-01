@@ -1342,20 +1342,15 @@
 	status = "okay";
 };
 
-&usb_2_hsphy0 {
-	vdda-pll-supply = <&vreg_l6d>;
-	vdda18-supply = <&vreg_l1c>;
-	vdda33-supply = <&vreg_l7d>;
-
-	status = "okay";
-};
-
-&usb_2_hsphy1 {
-	vdda-pll-supply = <&vreg_l6d>;
-	vdda18-supply = <&vreg_l1c>;
-	vdda33-supply = <&vreg_l7d>;
-
-	status = "okay";
+&usb_2_dwc3 {
+	/*
+	 * TODO: There is a huawei private transceiver which is connected to
+	 * usb2.0, with a quick test, pointing usb3-phy to hsphy2, we failed
+	 * to probe the transceiver. Is it possible to disable usb3-phy? how
+	 * properly to?
+	 */
+	phys = <&usb_2_hsphy2>, <&usb_2_qmpphy0>;
+	phy-names = "usb2-phy", "usb3-phy";
 };
 
 &usb_2_hsphy2 {
@@ -1366,24 +1361,9 @@
 	status = "okay";
 };
 
-&usb_2_hsphy3 {
-	vdda-pll-supply = <&vreg_l6d>;
-	vdda18-supply = <&vreg_l8c>;
-	vdda33-supply = <&vreg_l2d>;
-
-	status = "okay";
-};
-
 &usb_2_qmpphy0 {
 	vdda-phy-supply = <&vreg_l4d>;
 	vdda-pll-supply = <&vreg_l1b>;
-
-	status = "okay";
-};
-
-&usb_2_qmpphy1 {
-	vdda-phy-supply = <&vreg_l4d>;
-	vdda-pll-supply = <&vreg_l8d>;
 
 	status = "okay";
 };
