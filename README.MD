@@ -71,7 +71,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | USB-PD | works | fast charging(45W+) supported with UCSI EC driver |
 | USB-C DisplayPort Alt Mode | works | it may be broken nowadays (untested since ~6.14) |
 | Video acceleration | works | see [below](#Video-acceleration) |
-| Virtualisation | untested | see [here](https://github.com/TravMurav/slbounce) |
+| Virtualisation | works | see [below](#Virtualisation)|
 | Volumn keys | works | |
 | Watchdog | partial | One in sc8280xp works, another in EC not |
 | Wi-Fi | works | see [below](#Wi-Fi) |
@@ -249,6 +249,19 @@ SLPI(Sensor Low Power Island), [more details](https://lore.kernel.org/linux-devi
 ## Video acceleration
 Hardware video acceleration is supported via the Qualcomm Venus engine using the `v4l2m2m` API. Examples of usage:
 - **mpv**: `mpv --hwdec=v4l2m2m-copy <video>`
+
+## Virtualisation
+
+EL2 / KVM works on gaokun with an EL2 boot flow.
+
+Minimal setup:
+- use [`slbounce`](https://github.com/TravMurav/slbounce) to switch into EL2 at `ExitBootServices()`
+- use [`qebspil`](https://github.com/stephan-gh/qebspil) before Linux boot if you want DSP / remoteproc-dependent functions (such as audio) to work in EL2
+- place the required firmware files in the correct EFI path
+- boot Linux with the EL2 device tree (for example `sc8280xp-huawei-gaokun3-el2.dtb`)
+
+Kernel side should have virtualization, remoteproc, and Qualcomm PAS/Q6V5 support enabled.
+`slbounce` gets the system into EL2, while `qebspil` pre-starts the DSPs so Linux can hand them over correctly later.
 
 ## Wi-Fi
 Use [the script](https://github.com/qca/qca-swiss-army-knife/blob/master/tools/scripts/ath11k/ath11k-bdencoder),
