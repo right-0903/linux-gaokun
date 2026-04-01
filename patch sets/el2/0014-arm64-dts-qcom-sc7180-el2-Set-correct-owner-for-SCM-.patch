@@ -1,0 +1,35 @@
+From 9fe31c4e27010372682edf8ef6d7a4eea988ecd0 Mon Sep 17 00:00:00 2001
+From: Stephan Gerhold <stephan@gerhold.net>
+Date: Sun, 26 Oct 2025 14:52:44 +0100
+Subject: [PATCH 14/24] arm64: dts: qcom: sc7180-el2: Set correct owner for SCM
+ SHM bridge
+
+Signed-off-by: Stephan Gerhold <stephan@gerhold.net>
+---
+ arch/arm64/boot/dts/qcom/sc7180-el2.dtso | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/sc7180-el2.dtso b/arch/arm64/boot/dts/qcom/sc7180-el2.dtso
+index 6e8da59597b6..fe9c763b055c 100644
+--- a/arch/arm64/boot/dts/qcom/sc7180-el2.dtso
++++ b/arch/arm64/boot/dts/qcom/sc7180-el2.dtso
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: BSD-3-Clause
++#include <dt-bindings/firmware/qcom,scm.h>
+ 
+ /*
+  * sc7180 specific modifications required to boot in EL2.
+@@ -12,6 +13,10 @@ &gpu_zap_shader {
+ 	status = "disabled";
+ };
+ 
++&scm {
++	qcom,shm-bridge-vmid = <QCOM_SCM_VMID_SELF_OWNER>;
++};
++
+ /* Venus can be used in EL2 if booted similarly to ChromeOS devices. */
+ &venus {
+ 	video-firmware {
+-- 
+2.43.0
+
