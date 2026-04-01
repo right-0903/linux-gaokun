@@ -441,7 +441,6 @@
 			regulator-min-microvolt = <880000>;
 			regulator-max-microvolt = <880000>;
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
-			regulator-boot-on;
 			regulator-allow-set-load;
 			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
 						   RPMH_REGULATOR_MODE_HPM>;
@@ -839,8 +838,6 @@
 };
 
 &mdss0_dsi0_phy {
-	vdds-supply = <&vreg_l6b>;
-
 	status = "okay";
 };
 
@@ -863,8 +860,6 @@
 };
 
 &mdss0_dsi1_phy {
-	vdds-supply = <&vreg_l6b>;
-
 	status = "okay";
 };
 
@@ -1319,7 +1314,7 @@
 };
 
 &usb_1_hsphy {
-	vdda-pll-supply = <&vreg_l6b>;
+	vdda-pll-supply = <&vreg_l6d>;
 	vdda18-supply = <&vreg_l1c>;
 	vdda33-supply = <&vreg_l13c>;
 
