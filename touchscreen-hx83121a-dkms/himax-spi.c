@@ -1102,12 +1102,26 @@ static int himax_mcu_check_crc(struct himax_ts_data *ts, u32 start_addr,
 	return -EINVAL;
 }
 
+/* FIXME: timings are not matched well. The FW may not work properly after resume */
 static int himax_spi_panel_follower_resume(struct drm_panel_follower *follower)
 {
 	struct himax_ts_data *ts = container_of(follower, struct himax_ts_data,
 						panel_follower);
-	gpiod_set_value_cansleep(ts->gpiod_rst, 0);
-	msleep(50);
+	u32 crc_hw;
+	int ret;
+
+	ret = hx83121a_chip_detect(ts);
+	if (ret) {
+		dev_err(ts->dev, "%s: IC detect failed\n", __func__);
+		return ret;
+	}
+
+	ret = himax_mcu_check_crc(ts, 0, HIMAX_HX83121A_FLASH_SIZE, &crc_hw);
+	if (ret || crc_hw) {
+		dev_err(ts->dev, "hw crc failed, fw broken, fix it on windows\n");
+		return ret;
+	}
+
 	himax_disable_fw_reload(ts, 0); /* 0: follow huawei driver */
 	himax_mcu_power_on_init(ts);
 	himax_int_enable(ts, true);
@@ -1134,7 +1148,6 @@ static int himax_spi_probe(struct spi_device *spi)
 {
 	int ret;
 	struct himax_ts_data *ts;
-	u32 crc_hw;
 
 	ts = devm_kzalloc(&spi->dev, sizeof(struct himax_ts_data), GFP_KERNEL);
 	if (!ts)
@@ -1162,18 +1175,6 @@ static int himax_spi_probe(struct spi_device *spi)
 	spin_lock_init(&ts->irq_lock);
 	dev_set_drvdata(&spi->dev, ts);
 	spi_set_drvdata(spi, ts);
-
-	ret = hx83121a_chip_detect(ts);
-	if (ret) {
-		dev_err(ts->dev, "%s: IC detect failed\n", __func__);
-		return ret;
-	}
-
-	ret = himax_mcu_check_crc(ts, 0, HIMAX_HX83121A_FLASH_SIZE, &crc_hw);
-	if (ret || crc_hw) {
-		dev_err(ts->dev, "hw crc failed, fw broken, fix it on windows\n");
-		return ret;
-	}
 
 	ret = himax_input_dev_config(ts);
 	if (ret) {
