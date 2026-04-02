@@ -307,3 +307,8 @@ regenerate it,
 ```
 ./ath11k-bdencoder -c board-2.json
 ```
+
+## BIOS
+BIOS is inaccessible in HLOS(like Windows or Linux) for now. If you want to dump BIOS, check [this](./docs/BIOS/bios.md)
+
+There are [patches](https://lore.kernel.org/linux-arm-msm/20260126-scm-storage-v2-v2-0-fa045c7e7699@radxa.com/) to support it on Linux. But nobody tested it on gaokun.
