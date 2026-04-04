@@ -32,6 +32,14 @@
 #define HIMAX_REG_SZ					4U
 #define HIMAX_MAX_RX					60U
 #define HIMAX_MAX_TX					40U
+#define X_SCALE						45U
+#define Y_SCALE						1U
+#define X_TOTAL						2560U
+#define Y_TOTAL						1600U
+#define X_TOTAL_REV (X_SCALE * X_TOTAL * (HIMAX_MAX_RX + 1) / HIMAX_MAX_RX)
+#define Y_TOTAL_REV (Y_SCALE * Y_TOTAL * (HIMAX_MAX_TX + 1) / HIMAX_MAX_TX)
+#define DX					(X_TOTAL_REV / HIMAX_MAX_RX)
+#define DY					(Y_TOTAL_REV / HIMAX_MAX_TX)
 #define HIMAX_MAX_TOUCH					10
 #define HIMAX_HX83121A_SAFE_MODE_PASSWORD		0x9527
 /* FIXME: this is for hx83120j, ~4928 for hx83121a 40 * 60 * 2 + 128 */
@@ -779,26 +787,15 @@ sort:
 	}
 }
 
-/* generate numerator items */
-#define GEN_N(v1, v2, v3, n)		\
-do {					\
-	n = 3 * (v3) + (v2) - (v1);	\
-} while (0)
-
 static int rxtx2xy(u16 *arr, struct input_mt_pos *pos, u16 *strengths_out, int cnt)
 {
-	int i, out = 0, temp;
+	int i, out = 0;
 	int tx, rx;
-	u32 vl, vr, vc, vu, vd, vlu, vld, vru, vrd;
-	int n1, n2, n3, m;
-	int dx, dy, scale_x, scale_y;
+	u32 vl, vr, vc, vu, vd, vlu, vld, vru, vrd, vsum, temp;
 
 	/*
-	 * Weighted average, tweaked to reduce multiplication operations
-	 * and round error
-	 * FIXME: since zero weight for outer boundary, active windows
-	 * is only central (x, y) =
-	 * (2560/60/2, 2560 - 2560/60/2) x (1600/40/2, 1660 - 1600/40/2)
+	 * Simplified formula for weighted average, tweaked to reduce round
+	 * error.
 	 */
 	for (i = 0; i < cnt; ++i) {
 		tx = pos[i].y;
@@ -813,44 +810,27 @@ static int rxtx2xy(u16 *arr, struct input_mt_pos *pos, u16 *strengths_out, int c
 		if (vc < 800)
 			continue;
 
-		scale_x = 3;
-		scale_y = 1;
-		dx = scale_x * 2560 / HIMAX_MAX_RX;
-		dy = scale_y * 1600 / HIMAX_MAX_TX;
-
 		vl = dd2d(arr, tx, rx - 1);
 		vr = dd2d(arr, tx, rx + 1);
 		vu = dd2d(arr, tx - 1, rx);
 		vd = dd2d(arr, tx + 1, rx);
 
 #ifdef FIVE_POINT
-		GEN_N(vl, vc, vr, n2);
-		m = vl + vr + vc;
-		temp = dx * rx * m + dx / 2 * n2;
-		pos[out].x = temp / (scale_x * m);
-
-		GEN_N(vu, vc, vd, n2);
-		m = vu + vc + vd;
-		pos[out].y = dy * tx + dy / 2 * n2 / (scale_y * m);
-#endif
-
+		vlu = vld = vru = vrd = 0;
+#else
 		vlu = dd2d(arr, tx - 1, rx - 1);
 		vld = dd2d(arr, tx + 1, rx - 1);
 		vru = dd2d(arr, tx - 1, rx + 1);
 		vrd = dd2d(arr, tx + 1, rx + 1);
+#endif
 
-		m = vl + vr + vc + vu + vd + vlu + vld + vru + vrd;
+		vsum = vl + vr + vc + vu + vd + vlu + vld + vru + vrd;
 
-		GEN_N(vlu, vu, vru, n1);
-		GEN_N(vl, vc, vr, n2);
-		GEN_N(vld, vd, vrd, n3);
-		temp = dx * rx * m + dx / 2 * (n1 + n2 + n3);
-		pos[out].x = temp / (scale_x * m);
+		temp = DX * (rx * vsum + vru + vr + vrd - vlu - vl - vld);
+		pos[out].x = temp / (X_SCALE * vsum);
 
-		GEN_N(vlu, vl, vld, n1);
-		GEN_N(vu, vc, vd, n2);
-		GEN_N(vru, vr, vrd, n3);
-		pos[out].y = dy * tx + dy / 2 * (n1 + n2 + n3) / (scale_y * m);
+		temp = DY * (tx * vsum + vld + vd + vrd - vlu - vu - vru);
+		pos[out].y = temp / (Y_SCALE * vsum);
 
 		strengths_out[out] = vc;
 

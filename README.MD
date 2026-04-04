@@ -65,7 +65,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | Suspend | works | s2idle |
 | Thermal sensors | works |  |
 | Touchscreen over i2c | partial | see [below](#Touchscreen) |
-| Touchscreen over spi | partial | see [below](#over-spi) |
+| Touchscreen over spi | works | see [below](#over-spi) |
 | TPM | x | |
 | USB | works | |
 | USB-PD | works | fast charging(45W+) supported with UCSI EC driver |
@@ -232,12 +232,6 @@ i2ctransfer -y 4 w1@0x48 0x08 r2@0x48
 Only `43/41 07` are tested, swiping would not work well on `43 07` when resuming from suspend.
 
 #### algorithm
-Due to the limitation of algorithm, the active windows is only central area $A$.
-
-$$
-A = \\{ (x, y) | (x, y) \in (20.\dot{3}, 2537.\dot{3}) \times (19, 1579) \\}.
-$$
-
 There are several algorithms, check `ts/*` branches.
 
 In brief, `ts/caidj0`: improved multi-touch tracking.
