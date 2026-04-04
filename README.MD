@@ -60,7 +60,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | NVMe SSD | works | |
 | PCIe (x4) | works | |
 | Power key | works | |
-| Remoteproc | works | adsp, cdsp |
+| Remoteproc | works | adsp, cdsp, sdsp, see [below](#DSP-offloading) |
 | RTC | works | |
 | Suspend | works | s2idle |
 | Thermal sensors | works |  |
@@ -170,6 +170,11 @@ Only core power sequence is taken into account (vddi, avdd/vsp, avee/vsn, bl), f
 
 **Addition: Some patches are first proposed by [matalama80td3l](https://github.com/matalama80td3l) at [here](https://gitlab.freedesktop.org/drm/msm/-/issues/56). I verified and completed them.**
 
+## DSP offloading
+On this platform, we can offload tasks to ADSP or CDSP, [FastRPC reference](https://github.com/qualcomm/fastrpc).
+
+To be filled.
+
 ## Touchscreen
 ### insights
 This cascade IC is located at @0x48 @0x49 of i2c4. Its HID interfaces are @0x4f @0x50 respectively.
@@ -257,7 +262,6 @@ temp20:       +25.9°C
 ## SLPI
 SLPI(Sensor Low Power Island), [more details](https://lore.kernel.org/linux-devicetree/20230406173148.28309-1-me@dylanvanassche.be/).
 
-[Fastrpc reference](https://github.com/qualcomm/fastrpc).
 
 ## Video acceleration
 Hardware video acceleration is supported via the Qualcomm Venus engine using the `v4l2m2m` API. Examples of usage:
