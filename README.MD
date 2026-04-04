@@ -48,7 +48,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | Camera | x | |
 | CPUfreq | works | |
 | Display | works |  |
-| Display sensors | untested | for rotation detect, light detect, etc. slpi and [fastrpc](https://github.com/qualcomm/fastrpc)  |
+| Display sensors | partial | for rotation detect, light detect, etc. see [slpi](#SLPI) |
 | EC | works | Battery and adapter status, wmi, ucsi, modern standby |
 | EFI variables | works | |
 | Fingerprint reader | x | FTE7001, gpio185 |
@@ -260,8 +260,23 @@ temp20:       +25.9°C
 ```
 
 ## SLPI
-SLPI(Sensor Low Power Island), [more details](https://lore.kernel.org/linux-devicetree/20230406173148.28309-1-me@dylanvanassche.be/).
+SLPI means Sensor Low Power Island, [more details](https://lore.kernel.org/linux-devicetree/20230406173148.28309-1-me@dylanvanassche.be/).
 
+You can reference the basic setup [here](https://gitlab.com/postmarketOS/pmaports/-/merge_requests/4050).
+
+The sensor config and registry can be found in subdir of `C:\Windows\System32\drivers\DriverData\Qualcomm\fastRPC`, partial files required by `hexagonrpcd` are provided by `qcSensorsConfigQrd8280.cab` / `C:\Window\System32\DriverStore\FileRepository\qcsensorsconfigqrd8280*`. Partial files from Windows should be converted by `dos2unix`, since Linux uses `LF` instead of `CRLF`.
+
+Recently, only accelerometer data can be fetched by
+```bash
+ssccli --sensor accelerometer
+```
+but `libssc` does not expose this meter to `iio-sensor-proxy` somehow.
+```bash
+# monitor-sensor --accel
+    Waiting for iio-sensor-proxy to appear
++++ iio-sensor-proxy appeared
+=== No accelerometer
+```
 
 ## Video acceleration
 Hardware video acceleration is supported via the Qualcomm Venus engine using the `v4l2m2m` API. Examples of usage:
