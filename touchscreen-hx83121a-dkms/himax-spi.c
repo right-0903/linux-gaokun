@@ -355,11 +355,12 @@ err:
 
 static void himax_pin_reset(struct himax_ts_data *ts)
 {
-	/* TODO: reduce to 10ms, 20ms? */
+	/* display reset gpio must be deasserted */
 	gpiod_set_value_cansleep(ts->gpiod_rst, 1);
-	usleep_range(20000, 20100);
+	usleep_range(5000, 5100);
 	gpiod_set_value_cansleep(ts->gpiod_rst, 0);
-	usleep_range(50000, 50100);
+	/* after ~5ms, reload flash, which will take ~55ms */
+	usleep_range(60000, 60100);
 }
 
 static void himax_int_enable(struct himax_ts_data *ts, bool enable)
@@ -475,11 +476,6 @@ without_check:
 	return -EIO;
 }
 
-static int hx83102j_sense_off(struct himax_ts_data *ts, bool check_en)
-{
-	return himax_sense_off(ts, check_en);
-}
-
 /**
  * @sw_reset: true for software reset, false for hardware reset
  *     true: write IC to leave safe mode
@@ -531,7 +527,7 @@ static int hx83121a_chip_detect(struct himax_ts_data *ts)
 		return ret;
 	}
 
-	ret = hx83102j_sense_off(ts, false);
+	ret = himax_sense_off(ts, false);
 	if (ret)
 		return ret;
 
@@ -1001,7 +997,7 @@ static int himax_mcu_power_on_init(struct himax_ts_data *ts)
 		}
 		dev_info(ts->dev, "%s: wait FW reload %u times\n", __func__, retry_cnt + 1);
 
-		usleep_range(10000, 11000);
+		msleep(30);
 	}
 
 	if (retry_cnt == retry_limit) {
@@ -1075,7 +1071,7 @@ static int himax_mcu_check_crc(struct himax_ts_data *ts, u32 start_addr,
 		}
 
 		dev_info(ts->dev, "%s: Waiting for HW ready!\n", __func__);
-		usleep_range(1000, 1100);
+		msleep(30);
 	}
 
 	dev_err(ts->dev, "%s: read FW status fail\n", __func__);
