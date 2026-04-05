@@ -42,7 +42,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | Feature | Status | Note |
 | ------- | ------ | ---- |
 | Audio  | works | see [below](#audio) |
-| Backlight | partial | see [below](#backlight) |
+| Backlight | works | see [below](#backlight) |
 | Battery | works | For more attributes, check `/sys/class/power_supply/gaokun-ec-battery/*`  |
 | Bluetooth | works | Adding board file for wifi will improve RF performance |
 | Camera | x | |
@@ -121,12 +121,8 @@ Recently, use the X13s' profile. \
 `sed -i 's/LENOVO.*ThinkPad X13s.*/LENOVO.*ThinkPad X13s.*|HUAWEI.*MateBook E.*\"/' /usr/share/alsa/ucm2/Qualcomm/sc8280xp/sc8280xp.conf`
 
 ## Backlight
-It is adjusted via DCS, but dcs broadcast mode is not implemented. So
-in landscape mode, the upper half panel receives the DCS command
-first, then the lower, adjusting in async mode may cause the issue.
-
-This IC can be adjusted via I2C, if we can figure out which i2c bus,
-we can dim it via I2C.
+It is adjusted via DCS. ~It can also be adjusted via I2C, if we can figure out
+which i2c bus, we can dim it via I2C.~ (DCS works well now, forget I2C.)
 
 ```bash
 $ strings DisplayDxe.efi | grep -i 'bklic'
