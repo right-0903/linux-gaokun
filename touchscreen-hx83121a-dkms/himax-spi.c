@@ -826,11 +826,11 @@ static int rxtx2xy(u16 *arr, struct input_mt_pos *pos, u16 *strengths_out, int c
 
 		vsum = vl + vr + vc + vu + vd + vlu + vld + vru + vrd;
 
-		temp = DX * (rx * vsum + vru + vr + vrd - vlu - vl - vld);
-		pos[out].x = temp / (X_SCALE * vsum);
+		temp = rx * vsum + vru + vr + vrd - vlu - vl - vld;
+		pos[out].x = mult_frac(temp, DX, X_SCALE * vsum);
 
-		temp = DY * (tx * vsum + vld + vd + vrd - vlu - vu - vru);
-		pos[out].y = temp / (Y_SCALE * vsum);
+		temp = tx * vsum + vld + vd + vrd - vlu - vu - vru;
+		pos[out].y = mult_frac(temp, DY, Y_SCALE * vsum);
 
 		strengths_out[out] = vc;
 
