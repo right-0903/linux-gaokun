@@ -1,0 +1,55 @@
+From cb16e82fd8ff01b0b0f28a1690c61fafbae3037f Mon Sep 17 00:00:00 2001
+From: local builder <builder@example.com>
+Date: Sun, 5 Apr 2026 08:37:38 +0000
+Subject: [PATCH] drm/msm/dsi: avoid link clock toggles during active video cmd
+ xfer
+
+When command transfers are issued while video mode is already streaming, link clocks and OPP are already managed by the video enable path.
+Skip the extra link_clk_set_rate()/link_clk_enable() in xfer_prepare and the matching link_clk_disable()/pm_runtime_put() in xfer_restore for the active-video case.
+
+This avoids transient OPP drops during brightness DCS updates, which can cause visible panel corruption/flicker on bonded DSI setups.
+---
+ drivers/gpu/drm/msm/dsi/dsi_host.c | 20 ++++++++++++++------
+ 1 file changed, 14 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/msm/dsi/dsi_host.c b/drivers/gpu/drm/msm/dsi/dsi_host.c
+index db6da9937..c1c8a91e1 100644
+--- a/drivers/gpu/drm/msm/dsi/dsi_host.c
++++ b/drivers/gpu/drm/msm/dsi/dsi_host.c
+@@ -2132,9 +2132,16 @@ int msm_dsi_host_xfer_prepare(struct mipi_dsi_host *host,
+ 	 * mdss interrupt is generated in mdp core clock domain
+ 	 * mdp clock need to be enabled to receive dsi interrupt
+ 	 */
+-	pm_runtime_get_sync(&msm_host->pdev->dev);
+-	cfg_hnd->ops->link_clk_set_rate(msm_host);
+-	cfg_hnd->ops->link_clk_enable(msm_host);
++	/*
++	 * When video mode is streaming, clocks are already enabled and
++	 * OPP is set by the video enable path. Skip redundant clock ops
++	 * to avoid xfer_restore dropping OPP to 0 during active video.
++	 */
++	if (!(msm_host->power_on && msm_host->enabled)) {
++		pm_runtime_get_sync(&msm_host->pdev->dev);
++		cfg_hnd->ops->link_clk_set_rate(msm_host);
++		cfg_hnd->ops->link_clk_enable(msm_host);
++	}
+ 
+ 	/* TODO: vote for bus bandwidth */
+ 
+@@ -2164,9 +2171,10 @@ void msm_dsi_host_xfer_restore(struct mipi_dsi_host *host,
+ 		dsi_set_tx_power_mode(1, msm_host);
+ 
+ 	/* TODO: unvote for bus bandwidth */
+-
+-	cfg_hnd->ops->link_clk_disable(msm_host);
+-	pm_runtime_put(&msm_host->pdev->dev);
++	if (!(msm_host->power_on && msm_host->enabled)) {
++		cfg_hnd->ops->link_clk_disable(msm_host);
++		pm_runtime_put(&msm_host->pdev->dev);
++	}
+ }
+ 
+ int msm_dsi_host_cmd_tx(struct mipi_dsi_host *host,
+-- 
+2.53.0
+
