@@ -613,8 +613,8 @@ static void himax_report_state(struct himax_ts_data *ts,
 		touchscreen_set_mt_pos(&pos[i], &ts->props, pos[i].x, pos[i].y);
 	}
 
-	/* Set dmax=400 to stably track fingers up to 4.5cm per frame */
-	int ret = input_mt_assign_slots(ts->input_dev, slots, pos, touch_num, 400);
+	/* Set dmax=0 to make fast swipe smooth */
+	int ret = input_mt_assign_slots(ts->input_dev, slots, pos, touch_num, 0);
 	if (ret < 0) {
 		dev_warn_ratelimited(ts->dev, "input_mt_assign_slots failed: %d\n", ret);
 		return;
