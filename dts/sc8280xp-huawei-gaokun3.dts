@@ -658,8 +658,8 @@
 
 		spi-max-frequency = <12000000>;
 
-		touchscreen-size-x = <2560>;
-		touchscreen-size-y = <1600>;
+		touchscreen-size-x = <25600>;
+		touchscreen-size-y = <16000>;
 
 		/*
 		 * internally handle invert first, two transformations are

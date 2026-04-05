@@ -32,10 +32,10 @@
 #define HIMAX_REG_SZ					4U
 #define HIMAX_MAX_RX					60U
 #define HIMAX_MAX_TX					40U
-#define X_SCALE						45U
+#define X_SCALE						9U
 #define Y_SCALE						1U
-#define X_TOTAL						2560U
-#define Y_TOTAL						1600U
+#define X_TOTAL						25600U
+#define Y_TOTAL						16000U
 #define X_TOTAL_REV (X_SCALE * X_TOTAL * (HIMAX_MAX_RX + 1) / HIMAX_MAX_RX)
 #define Y_TOTAL_REV (Y_SCALE * Y_TOTAL * (HIMAX_MAX_TX + 1) / HIMAX_MAX_TX)
 #define DX					(X_TOTAL_REV / HIMAX_MAX_RX)
