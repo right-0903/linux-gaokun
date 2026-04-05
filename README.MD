@@ -70,7 +70,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | USB | works | |
 | USB-PD | works | fast charging(45W+) supported with UCSI EC driver |
 | USB-C DisplayPort Alt Mode | works | it may be broken nowadays (untested since ~6.14) |
-| Video acceleration | works | see [below](#Video-acceleration) |
+| Video acceleration | partial | see [below](#Video-acceleration) |
 | Virtualisation | works | see [below](#Virtualisation)|
 | Volumn keys | works | |
 | Watchdog | partial | One in sc8280xp works, another in EC not |
@@ -273,8 +273,21 @@ but `libssc` does not expose this meter to `iio-sensor-proxy` somehow.
 ```
 
 ## Video acceleration
-Hardware video acceleration is supported via the Qualcomm Venus engine using the `v4l2m2m` API. Examples of usage:
-- **mpv**: `mpv --hwdec=v4l2m2m-copy <video>`
+Hardware decoding is supported via the Qualcomm Venus engine using the `v4l2m2m` API.
+
+For `mpv`, a simple user config for low-resource devices is:
+```ini
+profile=fast
+hwdec=v4l2m2m-copy
+vo=gpu
+swapchain-depth=8
+sws-fast=yes
+```
+
+Put it in `~/.config/mpv/mpv.conf`, or use it temporarily from the command line:
+- **mpv**: `mpv --hwdec=v4l2m2m-copy --vo=gpu --swapchain-depth=8 --sws-fast=yes <video>`
+
+Hardware encoding is not working yet.
 
 ## Virtualisation
 
@@ -282,8 +295,8 @@ EL2 / KVM works on gaokun with an EL2 boot flow.
 
 Minimal setup:
 - use [`slbounce`](https://github.com/TravMurav/slbounce) to switch into EL2 at `ExitBootServices()`
-- use [`qebspil`](https://github.com/stephan-gh/qebspil) before Linux boot if you want DSP / remoteproc-dependent functions (such as audio) to work in EL2
-- place the required firmware files in the correct EFI path
+- use [`qebspil`](https://github.com/stephan-gh/qebspil) before Linux boot, and apply the patches in [`patch sets/el2`](./patch%20sets/el2), if you want DSP / remoteproc-dependent functions (such as audio) to work in EL2
+- place the required firmware files and an old enough working `tcblaunch.exe` in the correct EFI path
 - boot Linux with the EL2 device tree (for example `sc8280xp-huawei-gaokun3-el2.dtb`)
 
 Kernel side should have virtualization, remoteproc, and Qualcomm PAS/Q6V5 support enabled.
