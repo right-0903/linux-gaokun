@@ -203,14 +203,21 @@ Intermittent touch when swiping. non-HLOS use this, such as BIOS configuration.
 > There are several ts firmwares, your one may not be supported.
 
 ```
-cfg_version display_version: timestamp
-43 08: 20 23 01 10 16 12 15 (boe ?)
-43 09: 20 23 01 10 16 16 29 (csot new ?)
-43 07: 20 23 01 10 16 07 43 (csot)
+        cfg_version display_version: timestamp panel
+2023:
+        43 08: 20 23 01 10 16 12 15 (boe ?)
+        43 09: 20 23 01 10 16 16 29 (csot new ?)
+        43 07: 20 23 01 10 16 07 43 (csot)
 
-41 08: 20 22 09 27 19 32 44 (boe ?)
-41 09: 20 22 09 27 19 34 25 (csot new ?)
-41 07: 20 22 09 27 19 30 56 (csot)
+2022:
+        41 08: 20 22 09 27 19 32 44 (boe ?)
+        41 09: 20 22 09 27 19 34 25 (csot new ?)
+        41 07: 20 22 09 27 19 30 56 (csot)
+
+2022 LTE:
+        3e 01: 20 22 09 16 15 12 33 (boe ?)
+        3e 02: 20 22 09 16 15 20 59 (csot new ?)
+        3e 00: 20 22 09 16 15 03 21 (csot)
 ```
 
 To check our ts firmware, do either
@@ -224,8 +231,15 @@ i2ctransfer -y 4 w5@0x48 0x00 0x00 0x15 0x02 0x00
 i2ctransfer -y 4 w2@0x48 0x0c 0x00
 i2ctransfer -y 4 w1@0x48 0x08 r2@0x48
 ```
+Note that every panel supports 3 firmwares. If you have a CSOT panel,
+you can flash `43/41 07` or `3e 00`. To do so, simply replace
+`himax_thp_drv.dll` (find it online or copy it from a corresponding
+model), then reboot. The touchscreen driver will flash the firmware
+automatically; during this process, the touchscreen will be
+unresponsive. Once it responds again, the flashing is complete.
 
-Only `43/41 07` are tested, swiping would not work well on `43 07` when resuming from suspend.
+`43/41 07` and `3e 00` are flashed and tested, on Linux, swiping may
+not work well on `43 07` when resuming from suspend.
 
 #### algorithm
 There are several algorithms, check `ts/*` branches.
