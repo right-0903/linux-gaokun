@@ -521,11 +521,7 @@ static int himax_sense_on(struct himax_ts_data *ts, bool sw_reset)
 static int hx83121a_chip_detect(struct himax_ts_data *ts)
 {
 	int ret;
-	u32 retry_cnt;
-	const u32 read_icid_retry_limit = 5;
 	union himax_dword_data data;
-
-	himax_pin_reset(ts);
 
 	ret = himax_mcu_interface_on(ts);
 	if (ret < 0) {
@@ -533,28 +529,25 @@ static int hx83121a_chip_detect(struct himax_ts_data *ts)
 		return ret;
 	}
 
+	/* sense off the MCU to prevent bus conflict when reading the IC ID. */
 	ret = himax_sense_off(ts, false);
 	if (ret)
 		return ret;
 
-	for (retry_cnt = 0; retry_cnt < read_icid_retry_limit; retry_cnt++) {
-		ret = himax_mcu_register_read(ts, HIMAX_REG_ADDR_ICID, data.byte, 4);
-		if (ret) {
-			dev_err(ts->dev, "%s: Read IC ID Fail\n", __func__);
-			return ret;
-		}
-
-		/*
-		 * For suffix > F, it should be (data.byte[1] & 0xF) + 'A'; // or 'a'
-		 * e.g. hx83102j: 0x83102900
-		 */
-		data.dword = le32_to_cpu(data.dword) >> 8;
-		dev_info(ts->dev, "Detected IC HX%06X\n", data.dword);
-
-		if (data.dword == 0x83121a)
-			return 0;
+	ret = himax_mcu_register_read(ts, HIMAX_REG_ADDR_ICID, data.byte, 4);
+	if (ret) {
+		dev_err(ts->dev, "%s: Read IC ID Fail\n", __func__);
+		return ret;
 	}
-	return -ENODEV;
+
+	/*
+	 * For suffix > F, it should be (data.byte[1] & 0xF) + 'A' or 'a'
+	 * e.g. hx83102j: 0x83102900
+	 */
+	data.dword = le32_to_cpu(data.dword) >> 8;
+	dev_info(ts->dev, "Detected IC HX%06X\n", data.dword);
+
+	return data.dword == 0x83121a ? 0 : -ENODEV;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1092,6 +1085,9 @@ static int himax_spi_panel_follower_resume(struct drm_panel_follower *follower)
 	u32 crc_hw;
 	int ret;
 
+	himax_pin_reset(ts);
+	himax_disable_fw_reload(ts, 1); /* reload once only when resume */
+
 	ret = hx83121a_chip_detect(ts);
 	if (ret) {
 		dev_err(ts->dev, "%s: IC detect failed\n", __func__);
@@ -1104,7 +1100,6 @@ static int himax_spi_panel_follower_resume(struct drm_panel_follower *follower)
 		return ret;
 	}
 
-	himax_disable_fw_reload(ts, 0); /* 0: follow huawei driver */
 	himax_mcu_power_on_init(ts);
 	himax_int_enable(ts, true);
 	return 0;
@@ -1115,6 +1110,9 @@ static int himax_spi_panel_follower_suspend(struct drm_panel_follower *follower)
 	struct himax_ts_data *ts = container_of(follower, struct himax_ts_data,
 						panel_follower);
 	himax_int_enable(ts, false);
+	himax_sense_off(ts, true);
+	/* HACK: until we can power down it, and notify fw at that time */
+	himax_disable_fw_reload(ts, 0);
 	gpiod_set_value_cansleep(ts->gpiod_rst, 1);
 	return 0;
 }
