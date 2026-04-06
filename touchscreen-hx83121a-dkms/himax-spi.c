@@ -55,7 +55,7 @@ HIMAX_MAX_TX + HIMAX_MAX_RX) * 2)
 #define HIMAX_AHB_ADDR_BYTE_0				0x00
 #define HIMAX_AHB_ADDR_RDATA_BYTE_0			0x08
 #define HIMAX_AHB_ADDR_ACCESS_DIRECTION			0x0c
-#define HIMAX_AHB_ADDR_INCR4				0x0d
+#define HIMAX_AHB_ADDR_BURST				0x0d
 #define HIMAX_AHB_ADDR_CONTI				0x13
 #define HIMAX_AHB_ADDR_EVENT_STACK			0x30
 #define HIMAX_AHB_ADDR_PSW_LB				0x31
@@ -63,9 +63,10 @@ HIMAX_MAX_TX + HIMAX_MAX_RX) * 2)
 /* AHB register values/commands */
 #define HIMAX_AHB_CMD_ACCESS_DIRECTION_READ		0x00
 #define HIMAX_AHB_CMD_CONTI				0x31
-#define HIMAX_AHB_CMD_INCR4				0x10
-#define HIMAX_AHB_CMD_INCR4_ADD_4_BYTE			0x01
 #define HIMAX_AHB_CMD_LEAVE_SAFE_MODE			0x0000
+#define HIMAX_AHB_CMD_BURST				0x10
+/* AMBA AHB Protocol Specification 3.6 */
+#define HIMAX_AHB_BURST_INCR4				0b11
 
 /* DSRAM flag addresses */
 #define HIMAX_DSRAM_ADDR_2ND_FLASH_RELOAD		0x100072c0
@@ -117,6 +118,7 @@ struct himax_ts_data {
 	/* lock for irq_save */
 	spinlock_t irq_lock;
 	bool irq_enabled;
+	bool incr4_en;
 	struct gpio_desc *gpiod_rst;
 	struct device *dev;
 	struct spi_device *spi;
@@ -218,19 +220,23 @@ static int himax_write(struct himax_ts_data *ts, u8 cmd, u8 *addr, const u8 *dat
 /**
  * himax_mcu_set_burst_mode() - Set burst mode for MCU
  * @ts: Himax touch screen data
- * @auto_add_4_byte: Enable auto add 4 byte mode
+ * @auto_add_4_byte: Enable auto add 4 byte mode (INCR4)
  *
  * Set burst mode for MCU, which is used for read/write data from/to MCU.
  * HIMAX_AHB_ADDR_CONTI config the IC to take data continuously,
- * HIMAX_AHB_ADDR_INCR4 config the IC to auto increment the address by 4 byte when
+ * HIMAX_AHB_ADDR_BURST config the IC to auto increment the address by 4 byte when
  * each 4 bytes read/write.
  *
  * Return: 0 on success, negative error code on failure
  */
+/* TODO: disable for spi 2000 data */
 static int himax_mcu_set_burst_mode(struct himax_ts_data *ts, bool auto_add_4_byte)
 {
 	int ret;
 	u8 tmp;
+
+	if (auto_add_4_byte == ts->incr4_en)
+		return 0;
 
 	tmp = HIMAX_AHB_CMD_CONTI;
 	ret = himax_write(ts, HIMAX_AHB_ADDR_CONTI, NULL, &tmp, 1);
@@ -239,15 +245,18 @@ static int himax_mcu_set_burst_mode(struct himax_ts_data *ts, bool auto_add_4_by
 		return ret;
 	}
 
-	tmp = HIMAX_AHB_CMD_INCR4;
+	tmp = HIMAX_AHB_CMD_BURST;
 	if (auto_add_4_byte)
-		tmp |= HIMAX_AHB_CMD_INCR4_ADD_4_BYTE;
+		tmp |= HIMAX_AHB_BURST_INCR4;;
 
-	ret = himax_write(ts, HIMAX_AHB_ADDR_INCR4, NULL, &tmp, 1);
-	if (ret < 0)
-		dev_err(ts->dev, "%s: write ahb_addr_incr4 failed\n", __func__);
+	ret = himax_write(ts, HIMAX_AHB_ADDR_BURST, NULL, &tmp, 1);
+	if (ret < 0) {
+		dev_err(ts->dev, "%s: write ahb_addr_burst failed\n", __func__);
+		return ret;
+	}
 
-	return ret;
+	ts->incr4_en = auto_add_4_byte;
+	return 0;
 }
 
 /*
@@ -281,12 +290,10 @@ static int himax_mcu_register_read(struct himax_ts_data *ts, u32 addr, u8 *buf, 
 	}
 
 	ret = himax_spi_read(ts, HIMAX_AHB_ADDR_RDATA_BYTE_0, buf, len);
-	if (ret < 0) {
+	if (ret < 0)
 		dev_err(ts->dev, "%s: read ahb_addr_rdata_byte_0 failed\n", __func__);
-		return ret;
-	}
 
-	return himax_mcu_set_burst_mode(ts, !(len > HIMAX_REG_SZ));
+	return ret;
 }
 
 /* Write the internal (SRAM)address and data to AHB register */
@@ -303,11 +310,10 @@ static int himax_mcu_register_write(struct himax_ts_data *ts, u32 addr, const u8
 	target_addr.dword = cpu_to_le32(addr);
 	ret = himax_write(ts, HIMAX_AHB_ADDR_BYTE_0,
 				target_addr.byte, buf, len + HIMAX_REG_SZ);
-	if (ret < 0) {
+	if (ret < 0)
 		dev_err(ts->dev, "%s: write ahb_addr_byte_0 failed\n", __func__);
-	}
 
-	return himax_mcu_set_burst_mode(ts, !(len > HIMAX_REG_SZ));
+	return ret;
 }
 
 /*
@@ -317,13 +323,12 @@ static int himax_mcu_register_write(struct himax_ts_data *ts, u32 addr, const u8
 static int himax_mcu_interface_on(struct himax_ts_data *ts)
 {
 	int ret;
-	u8 buf[HIMAX_REG_SZ];
-	u8 buf2[HIMAX_REG_SZ];
+	u8 byte, byte2;
 	u32 retry_cnt;
 	const u32 burst_retry_limit = 10;
 
 	/* Read a dummy register to wake up BUS. */
-	ret = himax_spi_read(ts, HIMAX_AHB_ADDR_RDATA_BYTE_0, buf, 4);
+	ret = himax_spi_read(ts, HIMAX_AHB_ADDR_RDATA_BYTE_0, &byte, 1);
 	if (ret < 0)
 		goto err;
 
@@ -333,15 +338,15 @@ static int himax_mcu_interface_on(struct himax_ts_data *ts)
 			goto err;
 
 		/* Check cmd */
-		ret = himax_spi_read(ts, HIMAX_AHB_ADDR_CONTI, buf, 1);
+		ret = himax_spi_read(ts, HIMAX_AHB_ADDR_CONTI, &byte, 1);
 		if (ret < 0)
 			goto err;
 
-		ret = himax_spi_read(ts, HIMAX_AHB_ADDR_INCR4, buf2, 1);
+		ret = himax_spi_read(ts, HIMAX_AHB_ADDR_BURST, &byte2, 1);
 		if (ret < 0)
 			goto err;
 
-		if (buf[0] == HIMAX_AHB_CMD_CONTI && buf2[0] == HIMAX_AHB_CMD_INCR4)
+		if (byte == HIMAX_AHB_CMD_CONTI && byte2 == HIMAX_AHB_CMD_BURST)
 			return 0;
 
 		usleep_range(1000, 1100);
@@ -361,6 +366,7 @@ static void himax_pin_reset(struct himax_ts_data *ts)
 	gpiod_set_value_cansleep(ts->gpiod_rst, 0);
 	/* after ~5ms, reload flash, which will take ~55ms */
 	usleep_range(60000, 60100);
+	ts->incr4_en = true; /* default value after reset */
 }
 
 static void himax_int_enable(struct himax_ts_data *ts, bool enable)
