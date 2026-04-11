@@ -349,7 +349,7 @@ It seems that HUAWEI calibrated for each unit. To extract the board file(calibra
 
 The board file is stored at the 12th partition of BIOS (a lot of calibration data in this partiton actually, color calibration, wifi calibration, sensor calibration and a Windows activation key). The file starts at 0x1000, size is 0xea04, another file starts at 0xfb00, size is 0xea04, They are exactly the same on my machine.
 
-Note that the unit calibration only works with 2.0 firmware which is provided by the downstream, [qrd driver](https://github.com/WOA-Project/Qualcomm-Reference-Drivers/blob/master/8280_QRD/200.0.68.0/qcwlan8280.cab) is compatible too. And the board file does not seem to be better than the x13s one we mentioned above, the x13s one has a better radio strength. Of course, you can choose to use the x13 one with 2.0 fw.
+Note that the unit calibration only works with 2.0 firmware which is provided by the downstream, this chip (WCN685x) can be found on sc8280xp qrd / partial sc8380xp crd, so [sc8280xp qrd driver](https://github.com/WOA-Project/Qualcomm-Reference-Drivers/blob/master/8280_QRD/200.0.68.0/qcwlan8280.cab) or [sc8380xp crd driver](https://github.com/WOA-Project/Qualcomm-Reference-Drivers/blob/master/8380_CRD/200.0.57.0/qcwlanhsp8380.cab) is compatible too. And the board file does not seem to be better than the x13s one we mentioned above, the x13s one has a better radio strength. Of course, you can choose to use the x13 one with 2.0 fw.
 
 ## BIOS
 BIOS is inaccessible in HLOS(like Windows or Linux) for now. If you want to dump BIOS, check [this](./docs/BIOS/bios.md)
