@@ -1,0 +1,48 @@
+From 5b99919ded38631a7e0d0dfb7d430ecd721a2ec8 Mon Sep 17 00:00:00 2001
+From: Pengyu Luo <mitltlatltl@gmail.com>
+Date: Mon, 13 Apr 2026 05:34:35 +0800
+Subject: [PATCH 3/3] platform: arm64: huawei-gaokun-ec: fix race when resume
+
+When resuming, IRQ handler may do EC transaction right now, but we
+must send resume code to EC first to resume it. This race may break
+resume. Disabling IRQ when suspend and enabling IRQ after sending
+resume code to fix it.
+
+Signed-off-by: Pengyu Luo <mitltlatltl@gmail.com>
+---
+ drivers/platform/arm64/huawei-gaokun-ec.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/platform/arm64/huawei-gaokun-ec.c b/drivers/platform/arm64/huawei-gaokun-ec.c
+index 1f00971ea133..d26e949acf5e 100644
+--- a/drivers/platform/arm64/huawei-gaokun-ec.c
++++ b/drivers/platform/arm64/huawei-gaokun-ec.c
+@@ -628,9 +628,13 @@ static int gaokun_ec_suspend(struct device *dev)
+ 	if (ec->suspended)
+ 		return 0;
+ 
++	disable_irq(ec->client->irq);
++
+ 	ret = gaokun_ec_write(ec, ec_req);
+-	if (ret)
++	if (ret) {
++		enable_irq(ec->client->irq);
+ 		return ret;
++	}
+ 
+ 	ec->suspended = true;
+ 
+@@ -655,6 +659,10 @@ static int gaokun_ec_resume(struct device *dev)
+ 		msleep(100); /* EC need time to resume */
+ 	}
+ 
++	if (ret)
++		return ret;
++
++	enable_irq(ec->client->irq);
+ 	ec->suspended = false;
+ 
+ 	return 0;
+-- 
+2.53.0
+
