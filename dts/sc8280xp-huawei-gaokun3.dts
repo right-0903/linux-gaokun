@@ -686,6 +686,11 @@
 		reg = <0x38>;
 
 		interrupts-extended = <&tlmm 107 IRQ_TYPE_LEVEL_LOW>; /* shared */
+		lid-gpios = <&tlmm 173 GPIO_ACTIVE_HIGH>;
+		bat-gpios = <&tlmm 41 GPIO_ACTIVE_HIGH>;
+
+		pinctrl-0 = <&ec_default>;
+		pinctrl-names = "default";
 
 		#address-cells = <1>;
 		#size-cells = <0>;
@@ -1484,6 +1489,22 @@
 		function = "gpio";
 		drive-strength = <2>;
 		bias-pull-up;
+	};
+
+	ec_default: ec-default-state {
+		lid-pins {
+			pins = "gpio173";
+			function = "gpio";
+			drive-strength = <4>;
+			bias-pull-down;
+		};
+
+		bat-pins {
+			pins = "gpio41";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-pull-down;
+		};
 	};
 
 	i2c4_default: i2c4-default-state {

@@ -56,7 +56,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | Hibernation | untested | |
 | Keyboard & Touchpad | works | |
 | Keyboard fn keys | partial | Assistant key(between `F6` and `F7`), WIFI key(`F9`), and Manager key(`F10`), they don't work. |
-| Lid | works |  |
+| Lid | partial | open lid does not wake up device |
 | NVMe SSD | works | |
 | PCIe (x4) | works | |
 | Power key | works | |

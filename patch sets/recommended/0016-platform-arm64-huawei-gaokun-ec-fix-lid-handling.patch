@@ -1,0 +1,56 @@
+From f73cf4e98b6f8520a2ff535e7bcf78b908483a80 Mon Sep 17 00:00:00 2001
+From: Pengyu Luo <mitltlatltl@gmail.com>
+Date: Mon, 13 Apr 2026 05:30:15 +0800
+Subject: [PATCH 2/3] platform: arm64: huawei-gaokun-ec: fix lid handling
+
+When opening or closing lid, downstream set gpio173 high/low, do it
+here too. Though we don't know the meaning.
+
+Signed-off-by: Pengyu Luo <mitltlatltl@gmail.com>
+---
+ drivers/platform/arm64/huawei-gaokun-ec.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/platform/arm64/huawei-gaokun-ec.c b/drivers/platform/arm64/huawei-gaokun-ec.c
+index 7170f8eb76f7..1f00971ea133 100644
+--- a/drivers/platform/arm64/huawei-gaokun-ec.c
++++ b/drivers/platform/arm64/huawei-gaokun-ec.c
+@@ -9,6 +9,7 @@
+ #include <linux/cleanup.h>
+ #include <linux/delay.h>
+ #include <linux/device.h>
++#include <linux/gpio/consumer.h>
+ #include <linux/hwmon.h>
+ #include <linux/hwmon-sysfs.h>
+ #include <linux/i2c.h>
+@@ -118,6 +119,7 @@ struct gaokun_ec {
+ 	struct mutex lock; /* EC transaction lock */
+ 	struct blocking_notifier_head notifier_list;
+ 	struct device *hwmon_dev;
++	struct gpio_desc *lid_sta;
+ 	struct input_dev *idev;
+ 	bool suspended;
+ };
+@@ -729,6 +731,7 @@ static irqreturn_t gaokun_ec_irq_handler(int irq, void *data)
+ 	case EC_EVENT_LID:
+ 		gaokun_ec_psy_read_byte(ec, EC_LID_STATE, &status);
+ 		status &= EC_LID_OPEN;
++		gpiod_set_value(ec->lid_sta, !!status);
+ 		input_report_switch(ec->idev, SW_LID, !status);
+ 		input_sync(ec->idev);
+ 		break;
+@@ -759,6 +762,11 @@ static int gaokun_ec_probe(struct i2c_client *client)
+ 	BLOCKING_INIT_NOTIFIER_HEAD(&ec->notifier_list);
+ 
+ 	/* Lid switch */
++	ec->lid_sta = devm_gpiod_get_optional(dev, "lid", GPIOD_OUT_HIGH);
++	if (IS_ERR(ec->lid_sta))
++		dev_err_probe(dev, PTR_ERR(ec->lid_sta),
++			      "Failed to get lid-gpios\n");
++
+ 	ec->idev = devm_input_allocate_device(dev);
+ 	if (!ec->idev)
+ 		return -ENOMEM;
+-- 
+2.53.0
+
