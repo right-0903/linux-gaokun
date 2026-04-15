@@ -1,19 +1,37 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ *
+ * ~6.13, once hi846 can be detected on 2022 model, but csiphy configuration
+ * was wrong, it is fixed now (6.19), but camera clks are wrong now. Remaining
+ * unusable.
  */
 
 #include <dt-bindings/leds/common.h>
 
+/* remove due to gpio pins collision, skip 2nd instance won't break things */
+/delete-node/ &cci1_i2c1;
+/delete-node/ &cci1_i2c1_default;
+/delete-node/ &cci1_i2c1_sleep;
+
+/* override */
+/delete-node/ &vreg_l2b;
+
 / {
+	aliases {
+		i2c1 = &cci1_i2c0;
+		i2c2 = &cci2_i2c1;
+	};
+
 	leds {
 		compatible = "gpio-leds";
 
+		pinctrl-0 = <&cam_indicator_en>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&camf_indicator_en>;
 
-		flash_camf: led-camera-indicator {
-			label = "white:camera-indicator";
+		/* always on when opening camera, take this into account */
+		flash_front: led-camera-indicator-front {
+			label = "white:camera-indicator-front";
 			function = LED_FUNCTION_INDICATOR;
 			color = <LED_COLOR_ID_WHITE>;
 			gpios = <&tlmm 34 GPIO_ACTIVE_HIGH>;
@@ -22,41 +40,141 @@
 			/* Reuse as a panic indicator until we get a "camera on" trigger */
 			panic-indicator;
 		};
+
+		/* FIXME: figure out power sequence */
+		flash_rear: led-camera-indicator-rear {
+			label = "white:camera-indicator-rear";
+			function = LED_FUNCTION_INDICATOR;
+			color = <LED_COLOR_ID_WHITE>;
+			gpios = <&tlmm 93 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "none";
+			default-state = "off";
+		};
 	};
 
-	vreg_camf_1v2: regulator-camf-lv2 {
+	vreg_camf_1p2: regulator-camf-1p2 {
 		compatible = "regulator-fixed";
 
-		regulator-name = "CAMF_1V2";
+		regulator-name = "vreg_camf_1p2";
 		regulator-min-microvolt = <1200000>;
 		regulator-max-microvolt = <1200000>;
 
 		gpio = <&tlmm 44 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 
-		pinctrl-0 = <&camf_lv2_reg_en>;
+		pinctrl-0 = <&camf_1p2_reg_en>;
+		pinctrl-names = "default";
+	};
+
+	vreg_camr: regulator-camr {
+		compatible = "regulator-fixed";
+
+		regulator-name = "vreg_camr";
+
+		gpio = <&tlmm 92 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+
+		pinctrl-0 = <&camr_reg_en>;
+		pinctrl-names = "default";
+	};
+
+/*
+	// for test
+	fake-reg-mclk3 {
+		compatible = "regulator-fixed-clock";
+		regulator-name = "fake-reg-mclk3";
+		clocks = <&camcc CAMCC_MCLK3_CLK>;
+
+		assigned-clocks = <&camcc CAMCC_MCLK3_CLK>;
+		assigned-clock-rates = <24000000>;
+
+		// must add output-high for each pin
+		pinctrl-0 = <&camf_rgb_default>;
 		pinctrl-names = "default";
 
-		regulator-boot-on;
+		regulator-always-on;
+	};
+
+	fake-reg-mclk4 {
+		compatible = "regulator-fixed-clock";
+		regulator-name = "fake-reg-mclk4";
+		clocks = <&camcc CAMCC_MCLK4_CLK>;
+
+		assigned-clocks = <&camcc CAMCC_MCLK4_CLK>;
+		assigned-clock-rates = <24000000>;
+
+		// must add output-high for each pin
+		pinctrl-0 = <&camr_rgb_default>;
+		pinctrl-names = "default";
+
+		regulator-always-on;
+	};*/
+};
+
+&apps_rsc {
+	regulators-0 {
+		vreg_l2b: ldo2 {
+			regulator-name = "vreg_l2b";
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <2800000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+
+		vreg_l7b: ldo7 {
+			regulator-name = "vreg_l7b";
+			regulator-min-microvolt = <2800000>;
+			regulator-max-microvolt = <2800000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
+	};
+
+	regulators-1 {
+		vreg_l2c: ldo2 {
+			regulator-name = "vreg_l2c";
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <1800000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+			/* may be used in audio codec driver (ACD) too */
+			// regulator-allow-set-load;
+			// regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
+			// 			   RPMH_REGULATOR_MODE_HPM>;
+		};
+
+		vreg_l11c: ldo11 {
+			regulator-name = "vreg_l11c";
+			regulator-min-microvolt = <2800000>;
+			regulator-max-microvolt = <2800000>;
+			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
+		};
 	};
 };
 
 &camss {
-
-	/* CSIPHY0 CSIPHY1 1.2v = l4d, 0.88v = l6d
-	 * TODO: CSIPHY2, CSIPHY3 1.2v = l3b, 0.88v = l6b
+	/*
+	 * CSIPHY0, CSIPHY1 1.2v = l4d, 0.88v = l6d
+	 * CSIPHY2, CSIPHY3 1.2v = l3b, 0.88v = l6b
+	 *
+	 * drivers/media/platform/qcom/camss/camss.c
 	 */
 
-	vdda-phy-supply = <&vreg_l6d>;
-	vdda-pll-supply = <&vreg_l4d>;
+	vdda-phy-supply = <&vreg_l6b>;
+	vdda-pll-supply = <&vreg_l3b>;
 
 	status = "okay";
 
 	ports {
-		port@0 { The port index denotes CSIPHY id i.e. csiphy0
-			csiphy0_lanes01_ep: endpoint@0 {
-				reg = <0>;
-				clock-lanes = <7>; required
+		/* TODO: read registers to determine lanes */
+		port@0 {
+			csiphy0_ep: endpoint {
+				clock-lanes = <7>;
+				data-lanes = <0 1>;
+				remote-endpoint = <&s5k3l6_ep>;
+			};
+		};
+
+		port@3 {
+			csiphy3_ep: endpoint@0 {
+				clock-lanes = <7>;
 				data-lanes = <0 1>;
 				remote-endpoint = <&hi846_ep>;
 			};
@@ -64,68 +182,136 @@
 	};
 };
 
-
 &cci1 {
+	// assigned-clocks = <&camcc CAMCC_CCI_1_CLK>;
+	// assigned-clock-rates = <37500000>;
+
 	status = "okay";
 };
-/*
+
 &cci1_i2c0 {
-	vcm@c {
+
+	/* For now, keep all on, then it can be probed */
+	voice_coil_motor: vcm@c {
+		compatible = "dongwoon,dw9714";
+		reg = <0xc>;
+		vcc-supply = <&vreg_l7b>; /* FIXME: more than one to power up */
 	};
 
+	/*
+	 * https://source.puri.sm/Librem5/linux/-/blob/pureos/latest/drivers/media/i2c/s5k3l6xx.c
+	 *
+	 * never been detected
+	 */
 	camera_rear: camera@10 {
-		reg = <0x10>;
+		compatible = "samsung,s5k3l6xx";
+		reg = <0x10>; /* FIXME */
+
+		pinctrl-0 = <&camr_rgb_default>;
+		pinctrl-names = "default";
+
 		clocks = <&camcc CAMCC_MCLK4_CLK>;
+
+		assigned-clocks = <&camcc CAMCC_MCLK4_CLK>;
+		assigned-clock-rates = <24000000>;
+
+		reset-gpios = <&tlmm 7 GPIO_ACTIVE_LOW>;
+
+		vddio-supply = <&vreg_camr>;
+		vdda-supply = <&vreg_l2b>; // 2.8v
+		vddd-supply = <&vreg_l2c>; // 1.8v
+
+		lens-focus = <&voice_coil_motor>;
+		flash-leds = <&flash_rear>;
+
+		orientation = <1>;
+		// rotation = <270>;
+
+		port {
+			s5k3l6_ep: endpoint {
+				data-lanes = <1 2>;
+				remote-endpoint = <&csiphy0_ep>;
+			};
+		};
 	};
+
+	// eeprom@50/51
 };
-*/
 
 &cci2 {
+	// assigned-clocks = <&camcc CAMCC_CCI_2_CLK>;
+	// assigned-clock-rates = <37500000>;
+
 	status = "okay";
 };
 
 &cci2_i2c1 {
+	// ??? @10 appears when CAMCC_MCLK3_CLK@19.2MHz
+	// ??? @2d
+
 	camera_front: camera@20 {
 		compatible = "hynix,hi846";
 		reg = <0x20>;
 
-		pinctrl-names = "default";
 		pinctrl-0 = <&camf_rgb_default>;
+		pinctrl-names = "default";
 
 		clocks = <&camcc CAMCC_MCLK3_CLK>;
-		clock-frequency = <24000000>; dummy, the default one is 19.2Mhz
+
+		/* cci_clk and this may be runtime */
+		assigned-clocks = <&camcc CAMCC_MCLK3_CLK>;
+		assigned-clock-rates = <24000000>;
 
 		reset-gpios = <&tlmm 15 GPIO_ACTIVE_LOW>;
-		vddio-supply = <&vreg_l2c>;
-		vdda-supply = <&vreg_l11c>;
-		vddd-supply = <&vreg_camf_1v2>;
+		vddio-supply = <&vreg_l2c>; // 1.8v
+		vdda-supply = <&vreg_l11c>; // 2.8v
+		vddd-supply = <&vreg_camf_1p2>;
 
 		orientation = <0>;	/* Front facing */
 		rotation = <90>;
 
-//		flash-leds = <&flash_camf>;
+		flash-leds = <&flash_front>; /* may break camera detect somehow */
 
 		port {
 			hi846_ep: endpoint {
 				data-lanes = <1 2>;
 				link-frequencies = /bits/ 64 <80000000 200000000>;
-				remote-endpoint = <&csiphy0_lanes01_ep>;
+				remote-endpoint = <&csiphy3_ep>;
 			};
 		};
 	};
+
+	// eeprom@50
+	// actuator???@58
 };
 
 &tlmm {
 
-	camf_indicator_en: camf-indicator-en-state {
-		pins = "gpio34";
+	cam_indicator_en: cam-indicator-en-state {
+		front-pins {
+			pins = "gpio34";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
+
+		rear-pins {
+			pins = "gpio93";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
+	};
+
+	camf_1p2_reg_en: camf-1p2-reg-en-state {
+		pins = "gpio44";
 		function = "gpio";
 		drive-strength = <2>;
 		bias-disable;
 	};
 
-	camf_lv2_reg_en: camf-lv2-reg-en-state {
-		pins = "gpio44";
+	camr_reg_en: camr-reg-en-state {
+		pins = "gpio92";
 		function = "gpio";
 		drive-strength = <2>;
 		bias-disable;
@@ -135,12 +321,37 @@
 		mclk-pins {
 			pins = "gpio17";
 			function = "cam_mclk";
-			drive-strength = <16>;
+			drive-strength = <8>;
 			bias-disable;
 		};
 
 		sc-rgb-xshut-n-pins {
 			pins = "gpio15";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
+	};
+
+	/*
+	 * rear sequence:
+	 * gpio92 1 (1.2v)
+	 * gpio93 0 flash light disabled as default ?
+	 * l2b 2.8v
+	 * l2c 1.8v
+	 * l7b 2.8v (vcm)
+	 * gpio7 1
+	 */
+	camr_rgb_default: camr-rgb-default-state {
+		mclk-pins {
+			pins = "gpio6";
+			function = "cam_mclk";
+			drive-strength = <8>;
+			bias-disable;
+		};
+
+		sc-rgb-xshut-n-pins {
+			pins = "gpio7";
 			function = "gpio";
 			drive-strength = <2>;
 			bias-disable;
