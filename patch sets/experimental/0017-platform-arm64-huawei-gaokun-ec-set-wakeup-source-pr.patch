@@ -1,0 +1,50 @@
+From abf535842265fe80e17460ce4de74f8495015643 Mon Sep 17 00:00:00 2001
+From: Pengyu Luo <mitltlatltl@gmail.com>
+Date: Sat, 18 Apr 2026 16:13:15 +0800
+Subject: [PATCH 2/2] platform: arm64: huawei-gaokun-ec: set wakeup source
+ properly
+
+Use ec irq instead of adapter to wakeup source, since it keeps spam
+wakeup event.
+
+Signed-off-by: Pengyu Luo <mitltlatltl@gmail.com>
+---
+ drivers/platform/arm64/huawei-gaokun-ec.c    | 1 +
+ drivers/power/supply/huawei-gaokun-battery.c | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/platform/arm64/huawei-gaokun-ec.c b/drivers/platform/arm64/huawei-gaokun-ec.c
+index e584045a4da8..f877c404739e 100644
+--- a/drivers/platform/arm64/huawei-gaokun-ec.c
++++ b/drivers/platform/arm64/huawei-gaokun-ec.c
+@@ -780,6 +780,7 @@ static int gaokun_ec_probe(struct i2c_client *client)
+ 
+ 	ec->client = client;
+ 	i2c_set_clientdata(client, ec);
++	device_init_wakeup(dev, true);
+ 	BLOCKING_INIT_NOTIFIER_HEAD(&ec->notifier_list);
+ 
+ 	ec->enable_gpio = devm_gpiod_get_optional(dev, "enable",
+diff --git a/drivers/power/supply/huawei-gaokun-battery.c b/drivers/power/supply/huawei-gaokun-battery.c
+index c8bef3a1d7f7..6212b0068d44 100644
+--- a/drivers/power/supply/huawei-gaokun-battery.c
++++ b/drivers/power/supply/huawei-gaokun-battery.c
+@@ -613,6 +613,7 @@ static int gaokun_psy_probe(struct auxiliary_device *adev,
+ 	auxiliary_set_drvdata(adev, ecbat);
+ 
+ 	psy_cfg.drv_data = ecbat;
++	psy_cfg.no_wakeup_source = true;
+ 	ecbat->adp_psy = devm_power_supply_register(dev, &gaokun_psy_adp_desc,
+ 						    &psy_cfg);
+ 	if (IS_ERR(ecbat->adp_psy))
+@@ -621,7 +622,6 @@ static int gaokun_psy_probe(struct auxiliary_device *adev,
+ 
+ 	psy_cfg.supplied_to = (char **)&gaokun_psy_bat_desc.name;
+ 	psy_cfg.num_supplicants = 1;
+-	psy_cfg.no_wakeup_source = true;
+ 	psy_cfg.attr_grp = gaokun_psy_features_groups;
+ 	ecbat->bat_psy = devm_power_supply_register(dev, &gaokun_psy_bat_desc,
+ 						    &psy_cfg);
+-- 
+2.53.0
+
