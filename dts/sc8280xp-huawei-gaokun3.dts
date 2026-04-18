@@ -685,9 +685,12 @@
 		compatible = "huawei,gaokun3-ec";
 		reg = <0x38>;
 
-		interrupts-extended = <&tlmm 107 IRQ_TYPE_LEVEL_LOW>; /* shared */
-		lid-gpios = <&tlmm 173 GPIO_ACTIVE_HIGH>;
+		interrupts = <GIC_SPI 644 IRQ_TYPE_EDGE_RISING>;
+		enable-gpios = <&tlmm 173 GPIO_ACTIVE_HIGH>;
 		bat-gpios = <&tlmm 41 GPIO_ACTIVE_HIGH>;
+
+		// not stable yet, so comment not it
+		// wakeup-source;
 
 		pinctrl-0 = <&ec_default>;
 		pinctrl-names = "default";
@@ -1492,7 +1495,7 @@
 	};
 
 	ec_default: ec-default-state {
-		lid-pins {
+		en-pins {
 			pins = "gpio173";
 			function = "gpio";
 			drive-strength = <4>;
