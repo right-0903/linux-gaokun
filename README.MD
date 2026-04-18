@@ -20,10 +20,12 @@ This project mainly refers to the following projects:
 
 ~Initial UCSI support will land on 6.16.~(landed)
 
-Dsi panel will land on 7.1
+~Dsi panel will land on 7.1.~(landed)
 
 ## Disclaimer
 I am just an amateur, a Linux noob, not educated with formal CS courses. You should never believe what I say below, except this sentence. I am not responsible for your actions; you do this all at your own risk!
+
+Nowadays, this is not fully tested, I am on local repo which is more experimental, and I don't spend too much on public one, you are on your own.
 
 ## Kernel
 Use mainline with [recommended patches](./patch%20sets/recommended). (My AUR [here](https://aur.archlinux.org/pkgbase/linux-gaokun3))
@@ -56,13 +58,13 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | Hibernation | untested | |
 | Keyboard & Touchpad | works | |
 | Keyboard fn keys | partial | Assistant key(between `F6` and `F7`), WIFI key(`F9`), and Manager key(`F10`), they don't work. |
-| Lid | partial | open lid does not wake up device |
+| Lid | works |  |
 | NVMe SSD | works | |
 | PCIe (x4) | works | |
 | Power key | works | |
 | Remoteproc | works | adsp, cdsp, sdsp, see [below](#DSP-offloading) |
 | RTC | works | |
-| Suspend | works | s2idle |
+| Suspend | works | s2idle. To support lid wakeup, EC may stop suspend with a 0xc0 event |
 | Thermal sensors | works |  |
 | Touchscreen over i2c | partial | see [below](#Touchscreen) |
 | Touchscreen over spi | works | see [below](#over-spi) |
