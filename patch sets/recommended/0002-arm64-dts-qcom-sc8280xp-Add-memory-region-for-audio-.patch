@@ -1,0 +1,54 @@
+From 2bd3fcba943b756ba46230a4cdb7ad0fe7481c07 Mon Sep 17 00:00:00 2001
+From: Pengyu Luo <mitltlatltl@gmail.com>
+Date: Sun, 19 Apr 2026 06:48:59 +0800
+Subject: [PATCH] arm64: dts: qcom: sc8280xp: Add memory-region for audio PD
+
+Reserve memory region for audio PD dynamic loading and remote heap
+requirements. Add the required VMID list for memory ownership
+transfers.
+
+Signed-off-by: Pengyu Luo <mitltlatltl@gmail.com>
+Link: https://lore.kernel.org/linux-arm-msm/20260418-talosaudio-v1-1-585ab22faaf4@oss.qualcomm.com/
+---
+ arch/arm64/boot/dts/qcom/sc8280xp.dtsi | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sc8280xp.dtsi b/arch/arm64/boot/dts/qcom/sc8280xp.dtsi
+index ee02acd18856..8d526ffede36 100644
+--- a/arch/arm64/boot/dts/qcom/sc8280xp.dtsi
++++ b/arch/arm64/boot/dts/qcom/sc8280xp.dtsi
+@@ -12,6 +12,7 @@
+ #include <dt-bindings/clock/qcom,sc8280xp-camcc.h>
+ #include <dt-bindings/clock/qcom,sc8280xp-lpasscc.h>
+ #include <dt-bindings/dma/qcom-gpi.h>
++#include <dt-bindings/firmware/qcom,scm.h>
+ #include <dt-bindings/interconnect/qcom,osm-l3.h>
+ #include <dt-bindings/interconnect/qcom,sc8280xp.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+@@ -683,7 +684,12 @@ reserved-region@80b00000 {
+ 		};
+ 
+ 		reserved-region@83b00000 {
+-			reg = <0 0x83b00000 0 0x1700000>;
++			reg = <0 0x83b00000 0 0xf00000>;
++			no-map;
++		};
++
++		adsp_rpc_remote_heap_mem: adsp-rpc-remote-heap@84a00000 {
++			reg = <0x0 0x84a00000 0x0 0x800000>;
+ 			no-map;
+ 		};
+ 
+@@ -2971,6 +2977,9 @@ fastrpc {
+ 					qcom,glink-channels = "fastrpcglink-apps-dsp";
+ 					label = "adsp";
+ 					qcom,non-secure-domain;
++					memory-region = <&adsp_rpc_remote_heap_mem>;
++					qcom,vmids = <QCOM_SCM_VMID_LPASS
++						      QCOM_SCM_VMID_ADSP_HEAP>;
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+ 
+-- 
+2.53.0
+
