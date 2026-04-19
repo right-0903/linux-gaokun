@@ -685,11 +685,16 @@
 		compatible = "huawei,gaokun3-ec";
 		reg = <0x38>;
 
-		interrupts = <GIC_SPI 644 IRQ_TYPE_EDGE_RISING>;
+		/*
+		 * This IRQ has an impact on touchscreen somehow, if you mind it
+		 * just specific it to 107, then the fake IRQ will be trigger
+		 * every millisecs.
+		 */
+		interrupts-extended = <&tlmm 103 IRQ_TYPE_LEVEL_LOW>;
 		enable-gpios = <&tlmm 173 GPIO_ACTIVE_HIGH>;
 		bat-gpios = <&tlmm 41 GPIO_ACTIVE_HIGH>;
 
-		// not stable yet, so comment not it
+		// not stable yet, so comment out it
 		// wakeup-source;
 
 		pinctrl-0 = <&ec_default>;

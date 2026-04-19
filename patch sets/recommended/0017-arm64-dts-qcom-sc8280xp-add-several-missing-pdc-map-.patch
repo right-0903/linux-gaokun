@@ -1,0 +1,40 @@
+From 226ef979eaff64d374cdbfea6e82a88c1d77a828 Mon Sep 17 00:00:00 2001
+From: Pengyu Luo <mitltlatltl@gmail.com>
+Date: Mon, 20 Apr 2026 00:45:15 +0800
+Subject: [PATCH 1/2] arm64: dts: qcom: sc8280xp: add several missing pdc map
+ entries
+
+pdc 215, 256, 257 are missing, but we can find tlmm pin 103, 84, 90
+are mapped to them respectively, so add the map entries from pdc to
+gic. These entries are reversed from .data section of qcgpio.sys
+
+Signed-off-by: Pengyu Luo <mitltlatltl@gmail.com>
+---
+ arch/arm64/boot/dts/qcom/sc8280xp.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sc8280xp.dtsi b/arch/arm64/boot/dts/qcom/sc8280xp.dtsi
+index 8d526ffede36..fa1bd27aa16f 100644
+--- a/arch/arm64/boot/dts/qcom/sc8280xp.dtsi
++++ b/arch/arm64/boot/dts/qcom/sc8280xp.dtsi
+@@ -5365,7 +5365,7 @@ pdc: interrupt-controller@b220000 {
+ 					  <211 699 1>,
+ 					  <212 705 1>,
+ 					  <213 450 1>,
+-					  <214 643 1>,
++					  <214 643 2>,
+ 					  <216 646 5>,
+ 					  <221 390 5>,
+ 					  <226 700 3>,
+@@ -5388,7 +5388,7 @@ pdc: interrupt-controller@b220000 {
+ 					  <252 798 1>,
+ 					  <253 765 1>,
+ 					  <254 763 1>,
+-					  <255 454 1>,
++					  <255 454 3>,
+ 					  <258 139 1>,
+ 					  <259 786 2>,
+ 					  <261 370 2>,
+-- 
+2.53.0
+
