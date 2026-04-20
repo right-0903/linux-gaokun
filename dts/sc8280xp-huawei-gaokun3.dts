@@ -685,12 +685,7 @@
 		compatible = "huawei,gaokun3-ec";
 		reg = <0x38>;
 
-		/*
-		 * This IRQ has an impact on touchscreen somehow, if you mind it
-		 * just specific it to 107, then the fake IRQ will be trigger
-		 * every millisecs.
-		 */
-		interrupts-extended = <&tlmm 103 IRQ_TYPE_LEVEL_LOW>;
+		interrupts-extended = <&pdc 215 IRQ_TYPE_LEVEL_LOW>;
 		enable-gpios = <&tlmm 173 GPIO_ACTIVE_HIGH>;
 		bat-gpios = <&tlmm 41 GPIO_ACTIVE_HIGH>;
 
@@ -1500,6 +1495,13 @@
 	};
 
 	ec_default: ec-default-state {
+		int-n-pins {
+			pins = "gpio103";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
+
 		en-pins {
 			pins = "gpio173";
 			function = "gpio";
