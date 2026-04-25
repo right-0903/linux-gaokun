@@ -47,7 +47,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | Backlight | works | see [below](#backlight) |
 | Battery | works | For more attributes, check `/sys/class/power_supply/gaokun-ec-battery/*`  |
 | Bluetooth | works | Adding board file for wifi will improve RF performance |
-| Camera | partial | coming soon, cleanup stage |
+| Camera | works | No plan to support tuning data, no plan to improve rear sensor (I just scan the code :P) |
 | CPUfreq | works | |
 | Display | works |  |
 | Display sensors | partial | for rotation detect, light detect, etc. see [slpi](#SLPI) |
@@ -162,6 +162,20 @@ Front sensor: hi846@20(2022), s5k4h7@2d(2023, better image quality)
 Rear sensor: s5k3l6@10(2022)
 
 This has been checked on only two 2022 models and one 2023 model.
+
+Rear sensor source [here](https://source.puri.sm/Librem5/linux/-/blob/pureos/latest/drivers/media/i2c/s5k3l6xx.c). With modification
+```diff
+--- s5k3l6xx.c  2026-04-25 19:24:34.921810254 +0800
++++ s5k3l6xx.c  2026-04-25 19:25:27.698067479 +0800
+@@ -1592,7 +1592,6 @@
+                dev_err(&c->dev,
+                        "External clock frequency out of range: %lu.\n",
+                        mclk_freq);
+-               goto err_me;
+        }
+        state->pixel_clock = (u64)mclk_freq * 80 * 4 / 4 / 6; // extclk * pll_multiplier * 4 / pre_pll_clk_div / vt_pix_clk_div
+
+```
 
 ## Display
 Only core power sequence is taken into account (vddi, avdd/vsp, avee/vsn, bl), for the complete sequence, check [here](panel-hx83121a-dkms/dsi_pwr_seq.txt).
