@@ -22,12 +22,10 @@
 	leds {
 		compatible = "gpio-leds";
 
-		pinctrl-0 = <&cam_indicator_en>;
+		pinctrl-0 = <&cam_indicator_en>, <&camera_flash_en>;
 		pinctrl-names = "default";
 
-		/* always on when opening camera, take this into account */
-		flash_front: led-camera-indicator-front {
-			label = "white:camera-indicator-front";
+		privacy_led: privacy-led {
 			function = LED_FUNCTION_INDICATOR;
 			color = <LED_COLOR_ID_WHITE>;
 			gpios = <&tlmm 34 GPIO_ACTIVE_HIGH>;
@@ -35,10 +33,8 @@
 			panic-indicator;
 		};
 
-		/* FIXME: figure out power sequence */
-		flash_rear: led-camera-indicator-rear {
-			label = "white:camera-indicator-rear";
-			function = LED_FUNCTION_INDICATOR;
+		camera_flash: led {
+			function = LED_FUNCTION_FLASH;
 			color = <LED_COLOR_ID_WHITE>;
 			gpios = <&tlmm 93 GPIO_ACTIVE_HIGH>;
 			linux,default-trigger = "none";
@@ -100,6 +96,7 @@
 			// regulator-allow-set-load;
 			// regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
 			// 			   RPMH_REGULATOR_MODE_HPM>;
+			regulator-always-on;
 		};
 
 		vreg_l11c: ldo11 {
@@ -148,22 +145,24 @@
 };
 
 &cci1 {
-	status = "disabled";
+	status = "okay";
 };
 
 &cci1_i2c0 {
-
-	/* For now, keep all on, then it can be probed */
 	voice_coil_motor: vcm@c {
 		compatible = "dongwoon,dw9714";
 		reg = <0xc>;
-		vcc-supply = <&vreg_l7b>; /* FIXME: more than one to power up */
+		vcc-supply = <&vreg_l7b>; /* FIXME: require l2c on first */
 	};
 
 	/*
 	 * https://source.puri.sm/Librem5/linux/-/blob/pureos/latest/drivers/media/i2c/s5k3l6xx.c
 	 *
-	 * never been detected on 2023 model
+	 * poor image quality, no plan to extract downstream registers
+	 * configuration for it. I think nobody uses camera without tuning
+	 * to take photos. Front camera with conference is enough.
+	 *
+	 * This sensor has never been detected on 2023 model
 	 */
 	camera_rear: camera@10 {
 		compatible = "samsung,s5k3l6xx";
@@ -173,21 +172,22 @@
 		pinctrl-names = "default";
 
 		clocks = <&camcc CAMCC_MCLK4_CLK>;
+		clock-names = "mclk";
+		clock-frequency = <24000000>;
 
-		assigned-clocks = <&camcc CAMCC_MCLK4_CLK>;
-		assigned-clock-rates = <24000000>;
-
-		reset-gpios = <&tlmm 7 GPIO_ACTIVE_LOW>;
+		rstn-gpios = <&tlmm 7 GPIO_ACTIVE_LOW>;
 
 		vddio-supply = <&vreg_camr>;
 		vdda-supply = <&vreg_l2b>; // 2.8v
 		vddd-supply = <&vreg_l2c>; // 1.8v
 
+		leds = <&privacy_led>; // &camera_flash can't be enabled for now
+		led-names = "privacy";
+
 		lens-focus = <&voice_coil_motor>;
-		flash-leds = <&flash_rear>;
 
 		orientation = <1>;
-		// rotation = <270>;
+		rotation = <180>; /* FIXME */
 
 		port {
 			s5k3l6_ep: endpoint {
@@ -197,7 +197,7 @@
 		};
 	};
 
-	// eeprom@50/51
+	// eeprom@50/51 <= l2c
 };
 
 &cci2 {
@@ -225,10 +225,11 @@
 		vdda-supply = <&vreg_l11c>;
 		vddd-supply = <&vreg_camf_1p2>;
 
-		orientation = <0>;	/* Front facing */
-		rotation = <90>;
+		leds = <&privacy_led>;
+		led-names = "privacy";
 
-		leds = <&flash_front>;
+		orientation = <0>;	/* Front facing */
+		rotation = <0>;
 
 		port {
 			hi846_ep: endpoint {
@@ -244,21 +245,18 @@
 };
 
 &tlmm {
-
 	cam_indicator_en: cam-indicator-en-state {
-		front-pins {
-			pins = "gpio34";
-			function = "gpio";
-			drive-strength = <2>;
-			bias-disable;
-		};
+		pins = "gpio34";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
+	};
 
-		rear-pins {
-			pins = "gpio93";
-			function = "gpio";
-			drive-strength = <2>;
-			bias-disable;
-		};
+	camera_flash_en: camera-flash-en-state {
+		pins = "gpio93";
+		function = "gpio";
+		drive-strength = <2>;
+		bias-disable;
 	};
 
 	camf_1p2_reg_en: camf-1p2-reg-en-state {
@@ -291,15 +289,6 @@
 		};
 	};
 
-	/*
-	 * rear sequence:
-	 * gpio92 1 (1.2v)
-	 * gpio93 0 flash light disabled as default ?
-	 * l2b 2.8v
-	 * l2c 1.8v
-	 * l7b 2.8v (vcm)
-	 * gpio7 1
-	 */
 	camr_rgb_default: camr-rgb-default-state {
 		mclk-pins {
 			pins = "gpio6";
