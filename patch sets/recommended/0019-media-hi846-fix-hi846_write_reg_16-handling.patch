@@ -1,0 +1,36 @@
+From cf289a51b4ad61197afd1360e194b64c3d69b20b Mon Sep 17 00:00:00 2001
+From: Pengyu Luo <mitltlatltl@gmail.com>
+Date: Sat, 25 Apr 2026 17:20:11 +0800
+Subject: [PATCH 1/4] media: hi846: fix hi846_write_reg_16 handling
+
+hi846_write_reg_16() does not clear a positive *err value on success.
+pm_runtime_get_if_in_use() returns a positive value when the device
+is already in use. When hi846_set_ctrl() passes &ret holding this
+positive value) to hi846_write_reg_16(), the function returns with ret
+as is, the positive value propagates back as a return code, which
+callers interpret as an error.
+
+Fix this by resetting *err to 0 only when it is positive.
+
+Fixes: 04fc06f6dc15 ("media: hi846: fix usage of pm_runtime_get_if_in_use()")
+Signed-off-by: Pengyu Luo <mitltlatltl@gmail.com>
+---
+ drivers/media/i2c/hi846.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/media/i2c/hi846.c b/drivers/media/i2c/hi846.c
+index a3f77b8434ca..09c109f3fba9 100644
+--- a/drivers/media/i2c/hi846.c
++++ b/drivers/media/i2c/hi846.c
+@@ -1270,6 +1270,8 @@ static void hi846_write_reg_16(struct hi846 *hi846, u16 reg, u16 val, int *err)
+ 
+ 	if (*err < 0)
+ 		return;
++	else
++		*err = 0;
+ 
+ 	put_unaligned_be16(reg, buf);
+ 	put_unaligned_be16(val, buf + 2);
+-- 
+2.54.0
+
