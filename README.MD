@@ -47,7 +47,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | Backlight | works | see [below](#backlight) |
 | Battery | works | For more attributes, check `/sys/class/power_supply/gaokun-ec-battery/*`  |
 | Bluetooth | works | Adding board file for wifi will improve RF performance |
-| Camera | x | |
+| Camera | partial | coming soon, cleanup stage |
 | CPUfreq | works | |
 | Display | works |  |
 | Display sensors | partial | for rotation detect, light detect, etc. see [slpi](#SLPI) |
@@ -156,12 +156,12 @@ ACTION=="add", SUBSYSTEM=="power_supply", KERNEL=="gaokun-ec-battery", ATTR{smar
 ```
 
 ## Camera
-* front camera sensor: hi846(cci2, gpio12: cci_i2c_sda, gpio13: cci_i2c_scl, CAMCC_MCLK3_CLK: 24MHz, gpio17, reset: gpio15)
-* rear camera sensor: s5k3l6(cci1, gpio10: cci_i2c_sda, gpio11: cci_i2c_scl, CAMCC_MCLK4_CLK: 24MHz, gpio6, reset: gpio7)
 
-Front sensor can be probed, no camera video.
+Front sensor: hi846@20(2022), s5k4h7@2d(2023, better image quality)
 
-The rear sensor can't be detected.
+Rear sensor: s5k3l6@10(2022)
+
+This has been checked on only two 2022 models and one 2023 model.
 
 ## Display
 Only core power sequence is taken into account (vddi, avdd/vsp, avee/vsn, bl), for the complete sequence, check [here](panel-hx83121a-dkms/dsi_pwr_seq.txt).

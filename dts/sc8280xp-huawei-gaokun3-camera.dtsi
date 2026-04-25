@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- *
- * ~6.13, once hi846 can be detected on 2022 model, but csiphy configuration
- * was wrong, it is fixed now (6.19), but camera clks are wrong now. Remaining
- * unusable.
  */
 
 #include <dt-bindings/leds/common.h>
@@ -35,9 +31,7 @@
 			function = LED_FUNCTION_INDICATOR;
 			color = <LED_COLOR_ID_WHITE>;
 			gpios = <&tlmm 34 GPIO_ACTIVE_HIGH>;
-			linux,default-trigger = "none";
 			default-state = "off";
-			/* Reuse as a panic indicator until we get a "camera on" trigger */
 			panic-indicator;
 		};
 
@@ -77,38 +71,6 @@
 		pinctrl-0 = <&camr_reg_en>;
 		pinctrl-names = "default";
 	};
-
-/*
-	// for test
-	fake-reg-mclk3 {
-		compatible = "regulator-fixed-clock";
-		regulator-name = "fake-reg-mclk3";
-		clocks = <&camcc CAMCC_MCLK3_CLK>;
-
-		assigned-clocks = <&camcc CAMCC_MCLK3_CLK>;
-		assigned-clock-rates = <24000000>;
-
-		// must add output-high for each pin
-		pinctrl-0 = <&camf_rgb_default>;
-		pinctrl-names = "default";
-
-		regulator-always-on;
-	};
-
-	fake-reg-mclk4 {
-		compatible = "regulator-fixed-clock";
-		regulator-name = "fake-reg-mclk4";
-		clocks = <&camcc CAMCC_MCLK4_CLK>;
-
-		assigned-clocks = <&camcc CAMCC_MCLK4_CLK>;
-		assigned-clock-rates = <24000000>;
-
-		// must add output-high for each pin
-		pinctrl-0 = <&camr_rgb_default>;
-		pinctrl-names = "default";
-
-		regulator-always-on;
-	};*/
 };
 
 &apps_rsc {
@@ -163,19 +125,22 @@
 	status = "okay";
 
 	ports {
-		/* TODO: read registers to determine lanes */
 		port@0 {
-			csiphy0_ep: endpoint {
+			csiphy0_ep: endpoint@0 {
+				reg = <0>;
+
 				clock-lanes = <7>;
-				data-lanes = <0 1>;
+				data-lanes = <0 1 2 3>;
 				remote-endpoint = <&s5k3l6_ep>;
 			};
 		};
 
 		port@3 {
 			csiphy3_ep: endpoint@0 {
+				reg = <0>;
+
 				clock-lanes = <7>;
-				data-lanes = <0 1>;
+				data-lanes = <0 1 2 3>;
 				remote-endpoint = <&hi846_ep>;
 			};
 		};
@@ -183,10 +148,7 @@
 };
 
 &cci1 {
-	// assigned-clocks = <&camcc CAMCC_CCI_1_CLK>;
-	// assigned-clock-rates = <37500000>;
-
-	status = "okay";
+	status = "disabled";
 };
 
 &cci1_i2c0 {
@@ -201,11 +163,11 @@
 	/*
 	 * https://source.puri.sm/Librem5/linux/-/blob/pureos/latest/drivers/media/i2c/s5k3l6xx.c
 	 *
-	 * never been detected
+	 * never been detected on 2023 model
 	 */
 	camera_rear: camera@10 {
 		compatible = "samsung,s5k3l6xx";
-		reg = <0x10>; /* FIXME */
+		reg = <0x10>;
 
 		pinctrl-0 = <&camr_rgb_default>;
 		pinctrl-names = "default";
@@ -229,7 +191,7 @@
 
 		port {
 			s5k3l6_ep: endpoint {
-				data-lanes = <1 2>;
+				data-lanes = <1 2 3 4>;
 				remote-endpoint = <&csiphy0_ep>;
 			};
 		};
@@ -239,15 +201,12 @@
 };
 
 &cci2 {
-	// assigned-clocks = <&camcc CAMCC_CCI_2_CLK>;
-	// assigned-clock-rates = <37500000>;
-
 	status = "okay";
 };
 
 &cci2_i2c1 {
 	// ??? @10 appears when CAMCC_MCLK3_CLK@19.2MHz
-	// ??? @2d
+	// On 2023 model, S5K4H7@2d, image quality is better than hi846
 
 	camera_front: camera@20 {
 		compatible = "hynix,hi846";
@@ -258,31 +217,30 @@
 
 		clocks = <&camcc CAMCC_MCLK3_CLK>;
 
-		/* cci_clk and this may be runtime */
 		assigned-clocks = <&camcc CAMCC_MCLK3_CLK>;
 		assigned-clock-rates = <24000000>;
 
 		reset-gpios = <&tlmm 15 GPIO_ACTIVE_LOW>;
-		vddio-supply = <&vreg_l2c>; // 1.8v
-		vdda-supply = <&vreg_l11c>; // 2.8v
+		vddio-supply = <&vreg_l2c>;
+		vdda-supply = <&vreg_l11c>;
 		vddd-supply = <&vreg_camf_1p2>;
 
 		orientation = <0>;	/* Front facing */
 		rotation = <90>;
 
-		flash-leds = <&flash_front>; /* may break camera detect somehow */
+		leds = <&flash_front>;
 
 		port {
 			hi846_ep: endpoint {
-				data-lanes = <1 2>;
-				link-frequencies = /bits/ 64 <80000000 200000000>;
+				data-lanes = <1 2 3 4>;
+				link-frequencies = /bits/ 64 <80000000 144000000 200000000 288000000>;
 				remote-endpoint = <&csiphy3_ep>;
 			};
 		};
 	};
 
 	// eeprom@50
-	// actuator???@58
+	// actuator???@58, 2023 only
 };
 
 &tlmm {
@@ -321,7 +279,7 @@
 		mclk-pins {
 			pins = "gpio17";
 			function = "cam_mclk";
-			drive-strength = <8>;
+			drive-strength = <6>;
 			bias-disable;
 		};
 
@@ -346,7 +304,7 @@
 		mclk-pins {
 			pins = "gpio6";
 			function = "cam_mclk";
-			drive-strength = <8>;
+			drive-strength = <6>;
 			bias-disable;
 		};
 
