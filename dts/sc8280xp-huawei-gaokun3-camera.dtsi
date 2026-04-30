@@ -234,7 +234,7 @@
 		port {
 			hi846_ep: endpoint {
 				data-lanes = <1 2 3 4>;
-				link-frequencies = /bits/ 64 <80000000 144000000 200000000 288000000>;
+				link-frequencies = /bits/ 64 <180000000 360000000>;
 				remote-endpoint = <&csiphy3_ep>;
 			};
 		};
