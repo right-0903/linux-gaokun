@@ -1,0 +1,678 @@
+From git@z Thu Jan  1 00:00:00 1970
+Subject: [PATCH v4 1/4] soc: qcom: rpmh: Add support to read back resource
+ settings
+From: Maulik Shah <maulik.shah@oss.qualcomm.com>
+Date: Mon, 20 Apr 2026 21:13:38 +0530
+Message-Id: <20260420-read-rpmh-v3-v4-1-70c152e6c958@oss.qualcomm.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+All rpmh_*() APIs so far have supported placing votes for various resource
+settings but the H/W also have option to read resource settings.
+
+Add new rpmh_read() API to allow clients to read back resource setting
+from H/W. This will be useful for clients like regulators, which currently
+don't have a way to know the settings applied during bootloader stage.
+
+Reviewed-by: Konrad Dybcio <konrad.dybcio@oss.qualcomm.com>
+Reviewed-by: Dmitry Baryshkov <dmitry.baryshkov@oss.qualcomm.com>
+Signed-off-by: Maulik Shah <maulik.shah@oss.qualcomm.com>
+Signed-off-by: Kamal Wadhwa <kamal.wadhwa@oss.qualcomm.com>
+---
+ drivers/soc/qcom/rpmh-rsc.c | 13 +++++++++++--
+ drivers/soc/qcom/rpmh.c     | 47 +++++++++++++++++++++++++++++++++++++++++----
+ include/soc/qcom/rpmh.h     |  5 +++++
+ include/soc/qcom/tcs.h      |  2 ++
+ 4 files changed, 61 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/soc/qcom/rpmh-rsc.c b/drivers/soc/qcom/rpmh-rsc.c
+index c6f7d5c9c493d9e06c048930b8a14a38660df4b1..ec85c457ea4527f94339c2033bfcc12346e3c443 100644
+--- a/drivers/soc/qcom/rpmh-rsc.c
++++ b/drivers/soc/qcom/rpmh-rsc.c
+@@ -443,6 +443,7 @@ static irqreturn_t tcs_tx_done(int irq, void *p)
+ 	int i;
+ 	unsigned long irq_status;
+ 	const struct tcs_request *req;
++	u32 reg;
+ 
+ 	irq_status = readl_relaxed(drv->tcs_base + drv->regs[RSC_DRV_IRQ_STATUS]);
+ 
+@@ -453,6 +454,11 @@ static irqreturn_t tcs_tx_done(int irq, void *p)
+ 
+ 		trace_rpmh_tx_done(drv, i, req);
+ 
++		if (req->is_read) {
++			reg = drv->regs[RSC_DRV_CMD_RESP_DATA];
++			req->cmds[0].data = read_tcs_reg(drv, reg, i);
++		}
++
+ 		/* Clear AMC trigger & enable modes and
+ 		 * disable interrupt for this TCS
+ 		 */
+@@ -493,13 +499,15 @@ static void __tcs_buffer_write(struct rsc_drv *drv, int tcs_id, int cmd_id,
+ 			       const struct tcs_request *msg)
+ {
+ 	u32 msgid;
+-	u32 cmd_msgid = CMD_MSGID_LEN | CMD_MSGID_WRITE;
++	u32 cmd_msgid = CMD_MSGID_LEN;
+ 	u32 cmd_enable = 0;
+ 	struct tcs_cmd *cmd;
+ 	int i, j;
+ 
+ 	/* Convert all commands to RR when the request has wait_for_compl set */
+ 	cmd_msgid |= msg->wait_for_compl ? CMD_MSGID_RESP_REQ : 0;
++	if (!msg->is_read)
++		cmd_msgid |= CMD_MSGID_WRITE;
+ 
+ 	for (i = 0, j = cmd_id; i < msg->num_cmds; i++, j++) {
+ 		cmd = &msg->cmds[i];
+@@ -513,7 +521,8 @@ static void __tcs_buffer_write(struct rsc_drv *drv, int tcs_id, int cmd_id,
+ 
+ 		write_tcs_cmd(drv, drv->regs[RSC_DRV_CMD_MSGID], tcs_id, j, msgid);
+ 		write_tcs_cmd(drv, drv->regs[RSC_DRV_CMD_ADDR], tcs_id, j, cmd->addr);
+-		write_tcs_cmd(drv, drv->regs[RSC_DRV_CMD_DATA], tcs_id, j, cmd->data);
++		if (!msg->is_read)
++			write_tcs_cmd(drv, drv->regs[RSC_DRV_CMD_DATA], tcs_id, j, cmd->data);
+ 		trace_rpmh_send_msg(drv, tcs_id, msg->state, j, msgid, cmd);
+ 	}
+ 
+diff --git a/drivers/soc/qcom/rpmh.c b/drivers/soc/qcom/rpmh.c
+index ca37da3dc2b148c76e50e25885bd85a0cb47c9b6..f881c4c757ec8302b09eabf2f18bc79941a6f2c5 100644
+--- a/drivers/soc/qcom/rpmh.c
++++ b/drivers/soc/qcom/rpmh.c
+@@ -175,6 +175,9 @@ static int __rpmh_write(const struct device *dev, enum rpmh_state state,
+ 	struct cache_req *req;
+ 	int i;
+ 
++	if (rpm_msg->msg.is_read)
++		goto send_data;
++
+ 	/* Cache the request in our store and link the payload */
+ 	for (i = 0; i < rpm_msg->msg.num_cmds; i++) {
+ 		req = cache_rpm_request(ctrlr, state, &rpm_msg->msg.cmds[i]);
+@@ -182,6 +185,7 @@ static int __rpmh_write(const struct device *dev, enum rpmh_state state,
+ 			return PTR_ERR(req);
+ 	}
+ 
++send_data:
+ 	if (state == RPMH_ACTIVE_ONLY_STATE) {
+ 		ret = rpmh_rsc_send_data(ctrlr_to_drv(ctrlr), &rpm_msg->msg);
+ 	} else {
+@@ -194,7 +198,7 @@ static int __rpmh_write(const struct device *dev, enum rpmh_state state,
+ }
+ 
+ static int __fill_rpmh_msg(struct rpmh_request *req, enum rpmh_state state,
+-		const struct tcs_cmd *cmd, u32 n)
++		const struct tcs_cmd *cmd, u32 n, bool is_read)
+ {
+ 	if (!cmd || !n || n > MAX_RPMH_PAYLOAD)
+ 		return -EINVAL;
+@@ -204,10 +208,45 @@ static int __fill_rpmh_msg(struct rpmh_request *req, enum rpmh_state state,
+ 	req->msg.state = state;
+ 	req->msg.cmds = req->cmd;
+ 	req->msg.num_cmds = n;
++	req->msg.is_read = is_read;
+ 
+ 	return 0;
+ }
+ 
++/**
++ * rpmh_read: Read a resource value
++ *
++ * @dev: The device making the request
++ * @cmd: The payload having address of resource to read
++ *
++ * Reads the value for the resource address given in tcs_cmd->addr
++ * and returns the tcs_cmd->data filled with same.
++ *
++ * Context: May sleep. Do not call from atomic contexts.
++ *
++ * Return: 0 on success, negative errno on failure
++ */
++int rpmh_read(const struct device *dev, struct tcs_cmd *cmd)
++{
++	DECLARE_COMPLETION_ONSTACK(compl);
++	DEFINE_RPMH_MSG_ONSTACK(dev, RPMH_ACTIVE_ONLY_STATE, &compl, rpm_msg);
++	int ret;
++
++	ret = __fill_rpmh_msg(&rpm_msg, RPMH_ACTIVE_ONLY_STATE, cmd, 1, true);
++	if (ret)
++		return ret;
++
++	ret = __rpmh_write(dev, RPMH_ACTIVE_ONLY_STATE, &rpm_msg);
++	if (ret)
++		return ret;
++
++	ret = wait_for_completion_timeout(&compl, RPMH_TIMEOUT_MS);
++	cmd[0].data = rpm_msg.cmd[0].data;
++
++	return (ret > 0) ? 0 : -ETIMEDOUT;
++}
++EXPORT_SYMBOL_GPL(rpmh_read);
++
+ /**
+  * rpmh_write_async: Write a set of RPMH commands
+  *
+@@ -230,7 +269,7 @@ int rpmh_write_async(const struct device *dev, enum rpmh_state state,
+ 		return -ENOMEM;
+ 	rpm_msg->needs_free = true;
+ 
+-	ret = __fill_rpmh_msg(rpm_msg, state, cmd, n);
++	ret = __fill_rpmh_msg(rpm_msg, state, cmd, n, false);
+ 	if (ret) {
+ 		kfree(rpm_msg);
+ 		return ret;
+@@ -257,7 +296,7 @@ int rpmh_write(const struct device *dev, enum rpmh_state state,
+ 	DEFINE_RPMH_MSG_ONSTACK(dev, state, &compl, rpm_msg);
+ 	int ret;
+ 
+-	ret = __fill_rpmh_msg(&rpm_msg, state, cmd, n);
++	ret = __fill_rpmh_msg(&rpm_msg, state, cmd, n, false);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -352,7 +391,7 @@ int rpmh_write_batch(const struct device *dev, enum rpmh_state state,
+ 	rpm_msgs = req->rpm_msgs;
+ 
+ 	for (i = 0; i < count; i++) {
+-		__fill_rpmh_msg(rpm_msgs + i, state, cmd, n[i]);
++		__fill_rpmh_msg(rpm_msgs + i, state, cmd, n[i], false);
+ 		cmd += n[i];
+ 	}
+ 
+diff --git a/include/soc/qcom/rpmh.h b/include/soc/qcom/rpmh.h
+index bdbee1a97d3685d8a6153d586ddf650bd3bd3dde..14ecbf242b6bd67c8167c176ed0970f42432f4f4 100644
+--- a/include/soc/qcom/rpmh.h
++++ b/include/soc/qcom/rpmh.h
+@@ -11,6 +11,8 @@
+ 
+ 
+ #if IS_ENABLED(CONFIG_QCOM_RPMH)
++int rpmh_read(const struct device *dev, struct tcs_cmd *cmd);
++
+ int rpmh_write(const struct device *dev, enum rpmh_state state,
+ 	       const struct tcs_cmd *cmd, u32 n);
+ 
+@@ -24,6 +26,9 @@ void rpmh_invalidate(const struct device *dev);
+ 
+ #else
+ 
++static inline int rpmh_read(const struct device *dev, struct tcs_cmd *cmd)
++{ return -ENODEV; }
++
+ static inline int rpmh_write(const struct device *dev, enum rpmh_state state,
+ 			     const struct tcs_cmd *cmd, u32 n)
+ { return -ENODEV; }
+diff --git a/include/soc/qcom/tcs.h b/include/soc/qcom/tcs.h
+index cff67ce25488e2d3603a7707af2ca77f8266a713..45b8513be2f9bb0957796476f6031146ee34e931 100644
+--- a/include/soc/qcom/tcs.h
++++ b/include/soc/qcom/tcs.h
+@@ -51,6 +51,7 @@ struct tcs_cmd {
+  * struct tcs_request: A set of tcs_cmds sent together in a TCS
+  *
+  * @state:          state for the request.
++ * @is_read:        set for read only requests
+  * @wait_for_compl: wait until we get a response from the h/w accelerator
+  *                  (same as setting cmd->wait for all commands in the request)
+  * @num_cmds:       the number of @cmds in this request
+@@ -58,6 +59,7 @@ struct tcs_cmd {
+  */
+ struct tcs_request {
+ 	enum rpmh_state state;
++	bool is_read;
+ 	u32 wait_for_compl;
+ 	u32 num_cmds;
+ 	struct tcs_cmd *cmds;
+
+-- 
+2.25.1
+
+From git@z Thu Jan  1 00:00:00 1970
+Subject: [PATCH v4 2/4] regulator: qcom-rpmh: Fix PMIC5 BOB bypass mode
+ handling
+From: Kamal Wadhwa <kamal.wadhwa@oss.qualcomm.com>
+Date: Mon, 20 Apr 2026 21:13:39 +0530
+Message-Id: <20260420-read-rpmh-v3-v4-2-70c152e6c958@oss.qualcomm.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+Currently, when `rpmh_regulator_set_mode_bypass()` helper function
+is called to set bypass mode, it sends PMIC4's BOB bypass mode
+value for even if its a PMIC5 BOB.
+
+To fix this, introduce new hw_data parameter`pmic_bypass_mode`
+to store bypass mode value. Use it to send correct PMIC bypass
+mode value that corresponds to PMIC4/5 BOB regulators from the
+helper function.
+
+Fixes: 610f29e5cc0e8d58 ("regulator: qcom-rpmh: Update PMIC modes for PMIC5")
+Reviewed-by: Dmitry Baryshkov <dmitry.baryshkov@oss.qualcomm.com>
+Reviewed-by: Konrad Dybcio <konrad.dybcio@oss.qualcomm.com>
+Signed-off-by: Kamal Wadhwa <kamal.wadhwa@oss.qualcomm.com>
+---
+ drivers/regulator/qcom-rpmh-regulator.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/regulator/qcom-rpmh-regulator.c b/drivers/regulator/qcom-rpmh-regulator.c
+index 6e4cb2871fca8d7f371660ceb0c73a092507a5ce..85fbf10f74bb3393071bc65681356312f27b7527 100644
+--- a/drivers/regulator/qcom-rpmh-regulator.c
++++ b/drivers/regulator/qcom-rpmh-regulator.c
+@@ -111,6 +111,7 @@ static const struct resource_name_formats vreg_rsc_name_lookup[NUM_REGULATOR_TYP
+  * @hpm_min_load_uA:		Minimum load current in microamps that requires
+  *				high power mode (HPM) operation.  This is used
+  *				for LDO hardware type regulators only.
++ * @pmic_bypass_mode:		The PMIC bypass mode value.
+  * @pmic_mode_map:		Array indexed by regulator framework mode
+  *				containing PMIC hardware modes.  Must be large
+  *				enough to index all framework modes supported
+@@ -125,6 +126,7 @@ struct rpmh_vreg_hw_data {
+ 	int					n_linear_ranges;
+ 	int					n_voltages;
+ 	int					hpm_min_load_uA;
++	int					pmic_bypass_mode;
+ 	const int				*pmic_mode_map;
+ 	unsigned int			      (*of_map_mode)(unsigned int mode);
+ };
+@@ -311,7 +313,7 @@ static int rpmh_regulator_vrm_set_mode_bypass(struct rpmh_vreg *vreg,
+ 		return pmic_mode;
+ 
+ 	if (bypassed)
+-		cmd.data = PMIC4_BOB_MODE_PASS;
++		cmd.data = vreg->hw_data->pmic_bypass_mode;
+ 	else
+ 		cmd.data = pmic_mode;
+ 
+@@ -767,6 +769,7 @@ static const struct rpmh_vreg_hw_data pmic4_bob = {
+ 	},
+ 	.n_linear_ranges = 1,
+ 	.n_voltages = 84,
++	.pmic_bypass_mode = PMIC4_BOB_MODE_PASS,
+ 	.pmic_mode_map = pmic_mode_map_pmic4_bob,
+ 	.of_map_mode = rpmh_regulator_pmic4_bob_of_map_mode,
+ };
+@@ -975,6 +978,7 @@ static const struct rpmh_vreg_hw_data pmic5_bob = {
+ 	},
+ 	.n_linear_ranges = 1,
+ 	.n_voltages = 32,
++	.pmic_bypass_mode = PMIC5_BOB_MODE_PASS,
+ 	.pmic_mode_map = pmic_mode_map_pmic5_bob,
+ 	.of_map_mode = rpmh_regulator_pmic4_bob_of_map_mode,
+ };
+
+-- 
+2.25.1
+
+From git@z Thu Jan  1 00:00:00 1970
+Subject: [PATCH v4 3/4] regulator: qcom-rpmh: readback
+ voltage/bypass/mode/status set during bootup
+From: Kamal Wadhwa <kamal.wadhwa@oss.qualcomm.com>
+Date: Mon, 20 Apr 2026 21:13:40 +0530
+Message-Id: <20260420-read-rpmh-v3-v4-3-70c152e6c958@oss.qualcomm.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+Currently, during regulator registration, regulator framework sends an
+unnecessary `min-microvolts` request for the rpmh-regulator device. This
+happens because in current design, we do not have a way to readback the
+voltage settings that was set during the bootloader stage.
+
+Fix this by using the rpmh_read() API to read the regulator voltage
+settings done during boot and make it available to regulator framework
+from the very first read after the bootup.
+
+Also use this API to read the status/mode/bypass settings as well. This
+will provide the regulator framework a sense of the initial settings
+done by bootloader and thus preventing any redundents writes for any
+setting post bootup incase the same setting was already applied during
+bootup.
+
+Signed-off-by: Kamal Wadhwa <kamal.wadhwa@oss.qualcomm.com>
+---
+ drivers/regulator/qcom-rpmh-regulator.c | 179 ++++++++++++++++++++++++++++++++
+ 1 file changed, 179 insertions(+)
+
+diff --git a/drivers/regulator/qcom-rpmh-regulator.c b/drivers/regulator/qcom-rpmh-regulator.c
+index 85fbf10f74bb3393071bc65681356312f27b7527..1add15d73cac67ad8c0b45aaad6fb2ae9b388180 100644
+--- a/drivers/regulator/qcom-rpmh-regulator.c
++++ b/drivers/regulator/qcom-rpmh-regulator.c
+@@ -14,6 +14,7 @@
+ #include <linux/regulator/driver.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/of_regulator.h>
++#include <linux/bits.h>
+ 
+ #include <soc/qcom/cmd-db.h>
+ #include <soc/qcom/rpmh.h>
+@@ -61,8 +62,13 @@ static const struct resource_name_formats vreg_rsc_name_lookup[NUM_REGULATOR_TYP
+ };
+ 
+ #define RPMH_REGULATOR_REG_VRM_VOLTAGE		0x0
++#define RPMH_REGULATOR_VOLTAGE_MASK		GENMASK(12, 0)
++
+ #define RPMH_REGULATOR_REG_ENABLE		0x4
++#define RPMH_REGULATOR_ENABLE_MASK		BIT(0)
++
+ #define RPMH_REGULATOR_REG_VRM_MODE		0x8
++#define RPMH_REGULATOR_MODE_MASK		GENMASK(2, 0)
+ 
+ #define PMIC4_LDO_MODE_RETENTION		4
+ #define PMIC4_LDO_MODE_LPM			5
+@@ -154,6 +160,7 @@ struct rpmh_vreg_hw_data {
+  * @voltage_selector:		Selector used for get_voltage_sel() and
+  *				set_voltage_sel() callbacks
+  * @mode:			RPMh VRM regulator current framework mode
++ * @status:			RPMh VRM regulator current framework status
+  */
+ struct rpmh_vreg {
+ 	struct device			*dev;
+@@ -166,6 +173,7 @@ struct rpmh_vreg {
+ 	bool				bypassed;
+ 	int				voltage_selector;
+ 	unsigned int			mode;
++	unsigned int			status;
+ };
+ 
+ /**
+@@ -210,6 +218,28 @@ static int rpmh_regulator_send_request(struct rpmh_vreg *vreg,
+ 	return ret;
+ }
+ 
++/**
++ * rpmh_regulator_read_data() - read data from RPMh
++ * @vreg:		Pointer to the RPMh regulator
++ * @cmd:		Pointer to the RPMh command struct to readback data
++ *
++ * Return: 0 on success, or a negative error number on failure
++ */
++static int rpmh_regulator_read_data(struct rpmh_vreg *vreg, struct tcs_cmd *cmd)
++{
++	return rpmh_read(vreg->dev, cmd);
++}
++
++static void rpmh_vreg_update_status(struct rpmh_vreg *vreg)
++{
++	if (!vreg->enabled)
++		vreg->status = REGULATOR_STATUS_OFF;
++	else if (vreg->bypassed)
++		vreg->status = REGULATOR_STATUS_BYPASS;
++	else
++		vreg->status = regulator_mode_to_status(vreg->mode);
++}
++
+ static int _rpmh_regulator_vrm_set_voltage_sel(struct regulator_dev *rdev,
+ 				unsigned int selector, bool wait_for_ack)
+ {
+@@ -248,9 +278,42 @@ static int rpmh_regulator_vrm_set_voltage_sel(struct regulator_dev *rdev,
+ 					selector > vreg->voltage_selector);
+ }
+ 
++static int _rpmh_regulator_vrm_get_voltage(struct regulator_dev *rdev, int *uV)
++{
++	struct rpmh_vreg *vreg = rdev_get_drvdata(rdev);
++	struct tcs_cmd cmd = {
++		.addr = vreg->addr + RPMH_REGULATOR_REG_VRM_VOLTAGE,
++	};
++	int min_uV = rdev->constraints->min_uV;
++	int max_uV = rdev->constraints->max_uV;
++	int ret, _uV = 0;
++
++	ret = rpmh_regulator_read_data(vreg, &cmd);
++	if (!ret)
++		_uV = (cmd.data & RPMH_REGULATOR_VOLTAGE_MASK) * 1000;
++	else
++		dev_err(vreg->dev, "failed to read VOLTAGE ret = %d\n", ret);
++
++	if (!_uV || (_uV >= min_uV && _uV <= max_uV))
++		*uV = _uV;
++	else
++		dev_err(vreg->dev, "read voltage %d is out-of-range[%d:%d]\n",
++						_uV, min_uV, max_uV);
++
++	return ret;
++}
++
+ static int rpmh_regulator_vrm_get_voltage_sel(struct regulator_dev *rdev)
+ {
+ 	struct rpmh_vreg *vreg = rdev_get_drvdata(rdev);
++	int ret, uV = 0;
++
++	if (vreg->voltage_selector < 0) {
++		ret = _rpmh_regulator_vrm_get_voltage(rdev, &uV);
++		if (!ret && uV != 0)
++			vreg->voltage_selector = regulator_map_voltage_linear_range(rdev,
++							uV, INT_MAX);
++	}
+ 
+ 	return vreg->voltage_selector;
+ }
+@@ -284,6 +347,8 @@ static int rpmh_regulator_set_enable_state(struct regulator_dev *rdev,
+ 	if (!ret)
+ 		vreg->enabled = enable;
+ 
++	rpmh_vreg_update_status(vreg);
++
+ 	return ret;
+ }
+ 
+@@ -333,9 +398,27 @@ static int rpmh_regulator_vrm_set_mode(struct regulator_dev *rdev,
+ 	if (!ret)
+ 		vreg->mode = mode;
+ 
++	rpmh_vreg_update_status(vreg);
++
+ 	return ret;
+ }
+ 
++static int rpmh_regulator_vrm_get_pmic_mode(struct rpmh_vreg *vreg, int *pmic_mode)
++{
++	struct tcs_cmd cmd = {
++		.addr = vreg->addr + RPMH_REGULATOR_REG_VRM_MODE,
++	};
++	int ret;
++
++	ret = rpmh_regulator_read_data(vreg, &cmd);
++	if (!ret)
++		*pmic_mode = cmd.data & RPMH_REGULATOR_MODE_MASK;
++	else
++		return -EINVAL;
++
++	return 0;
++}
++
+ static unsigned int rpmh_regulator_vrm_get_mode(struct regulator_dev *rdev)
+ {
+ 	struct rpmh_vreg *vreg = rdev_get_drvdata(rdev);
+@@ -343,6 +426,13 @@ static unsigned int rpmh_regulator_vrm_get_mode(struct regulator_dev *rdev)
+ 	return vreg->mode;
+ }
+ 
++static int rpmh_regulator_vrm_get_status(struct regulator_dev *rdev)
++{
++	struct rpmh_vreg *vreg = rdev_get_drvdata(rdev);
++
++	return vreg->status;
++}
++
+ /**
+  * rpmh_regulator_vrm_get_optimum_mode() - get the mode based on the  load
+  * @rdev:		Regulator device pointer for the rpmh-regulator
+@@ -379,6 +469,8 @@ static int rpmh_regulator_vrm_set_bypass(struct regulator_dev *rdev,
+ 	if (!ret)
+ 		vreg->bypassed = enable;
+ 
++	rpmh_vreg_update_status(vreg);
++
+ 	return ret;
+ }
+ 
+@@ -401,6 +493,7 @@ static const struct regulator_ops rpmh_regulator_vrm_ops = {
+ 	.list_voltage		= regulator_list_voltage_linear_range,
+ 	.set_mode		= rpmh_regulator_vrm_set_mode,
+ 	.get_mode		= rpmh_regulator_vrm_get_mode,
++	.get_status		= rpmh_regulator_vrm_get_status,
+ };
+ 
+ static const struct regulator_ops rpmh_regulator_vrm_drms_ops = {
+@@ -412,6 +505,7 @@ static const struct regulator_ops rpmh_regulator_vrm_drms_ops = {
+ 	.list_voltage		= regulator_list_voltage_linear_range,
+ 	.set_mode		= rpmh_regulator_vrm_set_mode,
+ 	.get_mode		= rpmh_regulator_vrm_get_mode,
++	.get_status		= rpmh_regulator_vrm_get_status,
+ 	.get_optimum_mode	= rpmh_regulator_vrm_get_optimum_mode,
+ };
+ 
+@@ -424,6 +518,7 @@ static const struct regulator_ops rpmh_regulator_vrm_bypass_ops = {
+ 	.list_voltage		= regulator_list_voltage_linear_range,
+ 	.set_mode		= rpmh_regulator_vrm_set_mode,
+ 	.get_mode		= rpmh_regulator_vrm_get_mode,
++	.get_status		= rpmh_regulator_vrm_get_status,
+ 	.set_bypass		= rpmh_regulator_vrm_set_bypass,
+ 	.get_bypass		= rpmh_regulator_vrm_get_bypass,
+ };
+@@ -432,6 +527,7 @@ static const struct regulator_ops rpmh_regulator_xob_ops = {
+ 	.enable			= rpmh_regulator_enable,
+ 	.disable		= rpmh_regulator_disable,
+ 	.is_enabled		= rpmh_regulator_is_enabled,
++	.get_status		= rpmh_regulator_vrm_get_status,
+ };
+ 
+ /**
+@@ -540,6 +636,83 @@ static int rpmh_regulator_init_vreg(struct rpmh_vreg *vreg, struct device *dev,
+ 	return 0;
+ }
+ 
++static int rpmh_regulator_determine_initial_status(struct rpmh_vreg *vreg)
++{
++	struct tcs_cmd cmd = {
++		.addr = vreg->addr + RPMH_REGULATOR_REG_ENABLE,
++	};
++	int ret, pmic_mode, mode;
++	int sts = 0;
++
++	ret = rpmh_regulator_read_data(vreg, &cmd);
++	if (ret) {
++		vreg->status = REGULATOR_STATUS_UNDEFINED;
++		dev_err(vreg->dev, "failed to read ENABLE status ret = %d\n", ret);
++
++		return ret;
++	}
++
++	sts = cmd.data & RPMH_REGULATOR_ENABLE_MASK;
++	if (!sts) {
++		vreg->status = REGULATOR_STATUS_OFF;
++
++		return 0;
++	}
++
++	if (vreg->hw_data->regulator_type == XOB) {
++		vreg->status = REGULATOR_STATUS_ON;
++
++		return 0;
++	}
++
++	ret = rpmh_regulator_vrm_get_pmic_mode(vreg, &pmic_mode);
++	if (ret < 0) {
++		vreg->mode = REGULATOR_MODE_INVALID;
++		vreg->status = REGULATOR_STATUS_UNDEFINED;
++		dev_err(vreg->dev, "failed to read pmic_mode ret = %d\n", ret);
++
++		return ret;
++	}
++
++	/*
++	 * NOTE: Since BOB4 BYPASS_MODE value = 0 we cannot confirm if that BOB
++	 * regulator has been sent into bypass mode by bootloader or if bootloader
++	 * just has not requested for any mode voting. Due this limitation, we
++	 * must check if the read pmic_mode value is non-zero before comparing it
++	 * to bypass mode value. This also is needed to avoid setting BYPASS status
++	 * for LDOs which dont support bypass mode, and have the pmic_bypass_mode
++	 * uninitialized value as zero in the vreg hw data. For such cases assume
++	 * lowest mode/status, if pmic_mode is zero, to allow for mode voting.
++	 */
++	if (!pmic_mode) {
++		for (mode = REGULATOR_MODE_STANDBY; mode > REGULATOR_MODE_INVALID; mode >>= 1) {
++			if (vreg->hw_data->pmic_mode_map[mode] >= 0) {
++				vreg->mode = mode;
++				break;
++			}
++		}
++
++		vreg->status = regulator_mode_to_status(vreg->mode);
++		return 0;
++	}
++
++	if (vreg->hw_data->pmic_bypass_mode == pmic_mode) {
++		vreg->bypassed = true;
++		vreg->status = REGULATOR_STATUS_BYPASS;
++		return 0;
++	}
++
++	for (mode = REGULATOR_MODE_STANDBY; mode > REGULATOR_MODE_INVALID; mode >>= 1) {
++		if (pmic_mode == vreg->hw_data->pmic_mode_map[mode]) {
++			vreg->mode = mode;
++			vreg->status = regulator_mode_to_status(vreg->mode);
++			break;
++		}
++	}
++
++	return 0;
++}
++
+ static const int pmic_mode_map_pmic4_ldo[REGULATOR_MODE_STANDBY + 1] = {
+ 	[REGULATOR_MODE_INVALID] = -EINVAL,
+ 	[REGULATOR_MODE_STANDBY] = PMIC4_LDO_MODE_RETENTION,
+@@ -1823,6 +1996,12 @@ static int rpmh_regulator_probe(struct platform_device *pdev)
+ 						vreg_data);
+ 		if (ret < 0)
+ 			return ret;
++
++		ret = rpmh_regulator_determine_initial_status(vreg);
++		if (ret < 0)
++			dev_err(dev, "failed to read initial status for %s\n",
++					vreg->rdesc.name);
++
+ 	}
+ 
+ 	return 0;
+
+-- 
+2.25.1
+
+From git@z Thu Jan  1 00:00:00 1970
+Subject: [PATCH v4 4/4] regulator: qcom-rpmh: Fix coding style issues
+From: Kamal Wadhwa <kamal.wadhwa@oss.qualcomm.com>
+Date: Mon, 20 Apr 2026 21:13:41 +0530
+Message-Id: <20260420-read-rpmh-v3-v4-4-70c152e6c958@oss.qualcomm.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+Fix the code style/format issues reported by checkpatch.pl
+script.
+
+Reviewed-by: Dmitry Baryshkov <dmitry.baryshkov@oss.qualcomm.com>
+Signed-off-by: Kamal Wadhwa <kamal.wadhwa@oss.qualcomm.com>
+---
+ drivers/regulator/qcom-rpmh-regulator.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/regulator/qcom-rpmh-regulator.c b/drivers/regulator/qcom-rpmh-regulator.c
+index 1add15d73cac67ad8c0b45aaad6fb2ae9b388180..55e6983ed9b150bf8a4e47da46715d8d5081cf4d 100644
+--- a/drivers/regulator/qcom-rpmh-regulator.c
++++ b/drivers/regulator/qcom-rpmh-regulator.c
+@@ -110,7 +110,7 @@ static const struct resource_name_formats vreg_rsc_name_lookup[NUM_REGULATOR_TYP
+  *				regulator
+  * @ops:			Pointer to regulator ops callback structure
+  * @voltage_ranges:		The possible ranges of voltages supported by this
+- * 				PMIC regulator type
++ *				PMIC regulator type
+  * @n_linear_ranges:		Number of entries in voltage_ranges
+  * @n_voltages:			The number of unique voltage set points defined
+  *				by voltage_ranges
+
+-- 
+2.25.1
+

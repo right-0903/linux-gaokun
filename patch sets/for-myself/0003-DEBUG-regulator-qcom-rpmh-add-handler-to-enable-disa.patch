@@ -1,0 +1,75 @@
+From 2747d10299e82328a5aefe8e4c05294f3f1d75cd Mon Sep 17 00:00:00 2001
+From: Pengyu Luo <mitltlatltl@gmail.com>
+Date: Wed, 29 Apr 2026 01:38:16 +0800
+Subject: [PATCH] DEBUG: regulator: qcom-rpmh: add handler to enable/disable
+ regualtors
+
+---
+ drivers/regulator/qcom-rpmh-regulator.c | 49 +++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
+
+diff --git a/drivers/regulator/qcom-rpmh-regulator.c b/drivers/regulator/qcom-rpmh-regulator.c
+index 979ad76bdde8..46eeef5cd70f 100644
+--- a/drivers/regulator/qcom-rpmh-regulator.c
++++ b/drivers/regulator/qcom-rpmh-regulator.c
+@@ -2373,8 +2373,57 @@ static ssize_t regulators_show(struct device *dev,
+ 
+ static DEVICE_ATTR_RO(regulators);
+ 
++static int rpmh_regulator_set_enable(u32 addr, struct device *dev,
++				     bool enable)
++{
++	struct rpmh_vreg vreg;
++	struct tcs_cmd cmd = {
++		.addr = addr + RPMH_REGULATOR_REG_ENABLE,
++		.data = enable,
++	};
++	int ret;
++
++	vreg.dev = dev;
++
++	ret = rpmh_regulator_send_request(&vreg, &cmd, enable);
++	if (ret)
++		pr_err("failed to set %d\n", ret);
++
++	return ret;
++}
++
++static ssize_t enable_store(struct device *dev,
++			    struct device_attribute *attr,
++			    const char *buf, size_t size)
++{
++	int ret = 0, on, i;
++	char name[8];
++
++	ret = sscanf(buf, "%6s %d", name, &on);
++	if (ret != 2)
++		return -EINVAL;
++
++	for (i = 0; i < ARRAY_SIZE(sc8280xp); ++i) {
++		if (!sc8280xp[i].name)
++			continue;
++		else if (!strcmp(sc8280xp[i].name, name)) {
++			ret = pr_err("%sable %s\n", on ? "en":"dis", name);
++			rpmh_regulator_set_enable(sc8280xp[i].addr, dev, on);
++			break;
++		}
++	}
++
++	if (i == ARRAY_SIZE(sc8280xp))
++		pr_err("failed to find %s\n", name);
++
++	return size;
++}
++
++static DEVICE_ATTR_WO(enable);
++
+ static struct attribute *rpmh_regulator_attrs[] = {
+ 	&dev_attr_regulators.attr,
++	&dev_attr_enable.attr,
+ 	NULL,
+ };
+ ATTRIBUTE_GROUPS(rpmh_regulator);
+-- 
+2.54.0
+

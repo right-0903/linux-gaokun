@@ -1,0 +1,306 @@
+From 539c01d266b4fee0ff22b540a92509af737248e2 Mon Sep 17 00:00:00 2001
+From: Pengyu Luo <mitltlatltl@gmail.com>
+Date: Tue, 28 Apr 2026 19:18:55 +0800
+Subject: [PATCH 2/2] DEBUG: regulator: qcom-rpmh: add handler to dump all
+ regulators listed in cmd-db
+
+This depend on 20260420-read-rpmh-v3-v4-0-70c152e6c958@oss.qualcomm.com
+---
+ drivers/regulator/qcom-rpmh-regulator.c | 220 ++++++++++++++++++++++++
+ 1 file changed, 220 insertions(+)
+
+diff --git a/drivers/regulator/qcom-rpmh-regulator.c b/drivers/regulator/qcom-rpmh-regulator.c
+index 0064001d003a..979ad76bdde8 100644
+--- a/drivers/regulator/qcom-rpmh-regulator.c
++++ b/drivers/regulator/qcom-rpmh-regulator.c
+@@ -166,6 +166,7 @@ struct rpmh_vreg {
+ 	struct device			*dev;
+ 	u32				addr;
+ 	struct regulator_desc		rdesc;
++	char				pmic_id;
+ 	const struct rpmh_vreg_hw_data	*hw_data;
+ 	bool				always_wait_for_ack;
+ 
+@@ -195,6 +196,9 @@ struct rpmh_vreg_init_data {
+ 	const struct rpmh_vreg_hw_data	*hw_data;
+ };
+ 
++static int rpmh_regulator_dbg(struct device *dev, u32 addr, const char *name,
++			       char id, char *buf);
++
+ /**
+  * rpmh_regulator_send_request() - send the request to RPMh
+  * @vreg:		Pointer to the RPMh regulator
+@@ -349,6 +353,10 @@ static int rpmh_regulator_set_enable_state(struct regulator_dev *rdev,
+ 
+ 	rpmh_vreg_update_status(vreg);
+ 
++	pr_err("%s%c: set enable %d\n",
++	       vreg->rdesc.name, vreg->pmic_id, enable);
++	rpmh_regulator_dbg(vreg->dev, vreg->addr, vreg->rdesc.name, vreg->pmic_id, NULL);
++
+ 	return ret;
+ }
+ 
+@@ -400,6 +408,11 @@ static int rpmh_regulator_vrm_set_mode(struct regulator_dev *rdev,
+ 
+ 	rpmh_vreg_update_status(vreg);
+ 
++	pr_err("%s%c: set mode %d\n",
++	       vreg->rdesc.name, vreg->pmic_id,
++	       vreg->hw_data->pmic_mode_map[mode]);
++	rpmh_regulator_dbg(vreg->dev, vreg->addr, vreg->rdesc.name, vreg->pmic_id, NULL);
++
+ 	return ret;
+ }
+ 
+@@ -471,6 +484,11 @@ static int rpmh_regulator_vrm_set_bypass(struct regulator_dev *rdev,
+ 
+ 	rpmh_vreg_update_status(vreg);
+ 
++	pr_err("%s%c: set bypass: %d\n",
++	       vreg->rdesc.name, vreg->pmic_id,
++	       vreg->bypassed);
++	rpmh_regulator_dbg(vreg->dev, vreg->addr, vreg->rdesc.name, vreg->pmic_id, NULL);
++
+ 	return ret;
+ }
+ 
+@@ -584,6 +602,7 @@ static int rpmh_regulator_init_vreg(struct rpmh_vreg *vreg, struct device *dev,
+ 		return -ENODEV;
+ 	}
+ 
++	vreg->pmic_id = *pmic_id;
+ 	vreg->rdesc.name = rpmh_data->name;
+ 	vreg->rdesc.supply_name = rpmh_data->supply_name;
+ 	vreg->hw_data = rpmh_data->hw_data;
+@@ -713,6 +732,182 @@ static int rpmh_regulator_determine_initial_status(struct rpmh_vreg *vreg)
+ 	return 0;
+ }
+ 
++struct _cmd_db {
++	u32 addr; char *name;
++};
++
++#define REGUALTOR_B 0
++#define REGUALTOR_C 30
++#define REGUALTOR_D 60
++#define REGUALTOR_E 90
++#define REGUALTOR_MAX_SIZE 30
++
++/*
++ * based on
++ * cat /sys/kernel/debug/cmd-db | grep -E 'ldo|smp|bob' | sort -k2 -V | uniq \
++ * | awk -F':| ' '{ print "{" $1 ", " $3 "},"}'
++ */
++const struct _cmd_db sc8280xp[] = {
++	[REGUALTOR_B] =
++	{0x40400, "smpb4"},
++	{0x40500, "smpb6"},
++	{0x40600, "smpb8"},
++	{0x40700, "smpb9"},
++	{0x40800, "smpb10"},
++	{0x40000, "smpb11"},
++	{0x40100, "smpb12"},
++	{0x40900, "ldob1"},
++	{0x41300, "ldob2"},
++	{0x41f00, "ldob3"},
++	{0x40a00, "ldob4"},
++	{0x42000, "ldob5"},
++	{0x40b00, "ldob6"},
++	{0x41400, "ldob7"},
++	{0x40c00, "ldob8"},
++	{0x40d00, "ldob9"},
++	{0x40e00, "ldob10"},
++	[REGUALTOR_C] =
++	{0x40300, "bobc1"},
++	{0x40200, "smpc1"},
++	{0x42600, "smpc2"},
++	{0x42700, "smpc3"},
++	{0x42800, "smpc4"},
++	{0x42900, "ldoc1"},
++	{0x42a00, "ldoc2"},
++	{0x41500, "ldoc3"},
++	{0x41600, "ldoc4"},
++	{0x41700, "ldoc5"},
++	{0x41800, "ldoc6"},
++	{0x41900, "ldoc7"},
++	{0x42b00, "ldoc8"},
++	{0x41a00, "ldoc9"},
++	{0x42100, "ldoc10"},
++	{0x41b00, "ldoc11"},
++	{0x42c00, "ldoc12"},
++	{0x41c00, "ldoc13"},
++	[REGUALTOR_D] =
++	{0x42d00, "smpd1"},
++	{0x42e00, "smpd10"},
++	{0x42f00, "smpd11"},
++	{0x43000, "smpd12"},
++	{0x41d00, "ldod2"},
++	{0x42200, "ldod3"},
++	{0x42300, "ldod4"},
++	{0x40f00, "ldod6"},
++	{0x41e00, "ldod7"},
++	{0x41000, "ldod8"},
++	{0x41100, "ldod9"},
++	{0x41200, "ldod10"},
++	[REGUALTOR_E] =
++	{0x43100, "smpe1"},
++	{0x43200, "smpe3"},
++	[REGUALTOR_E + REGUALTOR_MAX_SIZE] =
++	{0, NULL},
++};
++
++static const char *pmic_mode_name_pmic5_bob[] = {
++	 [PMIC5_BOB_MODE_PFM] = "PFM",
++	 [PMIC5_BOB_MODE_AUTO] = "AUTO",
++	 [PMIC5_BOB_MODE_PWM] = "PWM",
++};
++
++static const char *pmic_mode_name_pmic5_smps[] = {
++	 [PMIC5_SMPS_MODE_RETENTION] = "RET",
++	 [PMIC5_SMPS_MODE_PFM] = "PFM",
++	 [PMIC5_SMPS_MODE_AUTO] = "AUTO",
++	 [PMIC5_SMPS_MODE_PWM] = "PWM",
++};
++
++static const char *pmic_mode_name_pmic5_ldo[] = {
++	 [PMIC5_BOB_MODE_PASS] = "BYPASS",
++	 [PMIC5_LDO_MODE_RETENTION] = "RET",
++	 [PMIC5_LDO_MODE_LPM] = "LPM",
++	 [PMIC5_LDO_MODE_HPM] = "HPM",
++};
++
++static int rpmh_regulator_dbg(struct device *dev, u32 addr, const char *name,
++			      char id, char *buf)
++{
++	struct tcs_cmd cmd1 = {
++		.addr = addr + RPMH_REGULATOR_REG_ENABLE,
++	};
++	struct tcs_cmd cmd2 = {
++		.addr = addr + RPMH_REGULATOR_REG_VRM_VOLTAGE,
++	};
++	struct tcs_cmd cmd3 = {
++		.addr = addr + RPMH_REGULATOR_REG_VRM_MODE,
++	};
++
++	int ret, pmode;
++	const char *mode;
++	struct rpmh_vreg vreg;
++	vreg.dev = dev;
++
++	ret = rpmh_regulator_read_data(&vreg, &cmd1);
++	if (ret)
++		dev_err(dev, "failed to read ENABLE status ret = %d\n", ret);
++
++	ret = rpmh_regulator_read_data(&vreg, &cmd2);
++	if (ret)
++		dev_err(dev, "failed to read voltage status ret = %d\n", ret);
++
++	ret = rpmh_regulator_read_data(&vreg, &cmd3);
++	if (ret)
++		dev_err(dev, "failed to read mode status ret = %d\n", ret);
++
++	if (!ret)
++		pmode = cmd3.data & RPMH_REGULATOR_MODE_MASK;
++
++	if (!strncmp(name, "bob", 3))
++		mode = pmic_mode_name_pmic5_bob[pmode];
++	else if (!strncmp(name, "ldo", 3))
++		mode = pmic_mode_name_pmic5_ldo[pmode];
++	else if (!strncmp(name, "smp", 3))
++		mode = pmic_mode_name_pmic5_smps[pmode];
++
++	if (buf)
++		ret = sprintf(buf, "%s%c: enable %ld, voltage %ld, mode %s(%d)\n",
++			      name, id ? :' ', cmd1.data & RPMH_REGULATOR_ENABLE_MASK,
++			      (cmd2.data & RPMH_REGULATOR_VOLTAGE_MASK) * 1000, mode, pmode);
++
++	pr_warn("%s%c: enable %ld, voltage %ld, mode %s(%d)\n",
++		name, id ? :' ', cmd1.data & RPMH_REGULATOR_ENABLE_MASK,
++		(cmd2.data & RPMH_REGULATOR_VOLTAGE_MASK) * 1000, mode, pmode);
++
++	return ret;
++}
++
++static int rpmh_regulator_poll(struct device *dev, char id, char *buf)
++{
++	int start, ret = 0;
++
++	switch (id) {
++	case 'b':
++		start = REGUALTOR_B;
++		break;
++	case 'c':
++		start = REGUALTOR_C;
++		break;
++	case 'd':
++		start = REGUALTOR_D;
++		break;
++	case 'e':
++		start = REGUALTOR_E;
++		break;
++	default:
++		return 0;
++	}
++
++	for (int i = start; i < start + REGUALTOR_MAX_SIZE; ++i) {
++		if (sc8280xp[i].addr)
++			ret += rpmh_regulator_dbg(dev, sc8280xp[i].addr, sc8280xp[i].name, 0, buf + ret);
++		else
++			break;
++	}
++
++	return ret;
++}
++
+ static const int pmic_mode_map_pmic4_ldo[REGULATOR_MODE_STANDBY + 1] = {
+ 	[REGULATOR_MODE_INVALID] = -EINVAL,
+ 	[REGULATOR_MODE_STANDBY] = PMIC4_LDO_MODE_RETENTION,
+@@ -1987,6 +2182,8 @@ static int rpmh_regulator_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	rpmh_regulator_poll(dev, *pmic_id, NULL); /* probe concurrency, one by one */
++
+ 	for_each_available_child_of_node_scoped(dev->of_node, node) {
+ 		vreg = devm_kzalloc(dev, sizeof(*vreg), GFP_KERNEL);
+ 		if (!vreg)
+@@ -2160,11 +2357,34 @@ static const struct of_device_id __maybe_unused rpmh_regulator_match_table[] = {
+ };
+ MODULE_DEVICE_TABLE(of, rpmh_regulator_match_table);
+ 
++static ssize_t regulators_show(struct device *dev,
++			       struct device_attribute *attr,
++			       char *buf)
++{
++	int ret = 0;
++
++	ret += rpmh_regulator_poll(dev, 'b', buf);
++	ret += rpmh_regulator_poll(dev, 'c', buf + ret);
++	ret += rpmh_regulator_poll(dev, 'd', buf + ret);
++	ret += rpmh_regulator_poll(dev, 'e', buf + ret);
++
++	return ret;
++}
++
++static DEVICE_ATTR_RO(regulators);
++
++static struct attribute *rpmh_regulator_attrs[] = {
++	&dev_attr_regulators.attr,
++	NULL,
++};
++ATTRIBUTE_GROUPS(rpmh_regulator);
++
+ static struct platform_driver rpmh_regulator_driver = {
+ 	.driver = {
+ 		.name = "qcom-rpmh-regulator",
+ 		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
+ 		.of_match_table	= of_match_ptr(rpmh_regulator_match_table),
++		.dev_groups = rpmh_regulator_groups,
+ 	},
+ 	.probe = rpmh_regulator_probe,
+ };
+-- 
+2.54.0
+

@@ -1,0 +1,43 @@
+From ef3c8f5e15b591489a29fb8cf191e3fc9a581c2a Mon Sep 17 00:00:00 2001
+From: Pengyu Luo <mitltlatltl@gmail.com>
+Date: Tue, 28 Apr 2026 18:46:57 +0800
+Subject: [PATCH 1/2] regulator: qcom-rphm: use step_uV = 1000 for pm8350
+ pm8350c smps
+
+---
+ drivers/regulator/qcom-rpmh-regulator.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/regulator/qcom-rpmh-regulator.c b/drivers/regulator/qcom-rpmh-regulator.c
+index 55e6983ed9b1..0064001d003a 100644
+--- a/drivers/regulator/qcom-rpmh-regulator.c
++++ b/drivers/regulator/qcom-rpmh-regulator.c
+@@ -1062,10 +1062,10 @@ static const struct rpmh_vreg_hw_data pmic5_hfsmps510 = {
+ 	.regulator_type = VRM,
+ 	.ops = &rpmh_regulator_vrm_ops,
+ 	.voltage_ranges = (struct linear_range[]) {
+-		REGULATOR_LINEAR_RANGE(320000, 0, 215, 8000),
++		REGULATOR_LINEAR_RANGE(320000, 0, 1720, 1000),
+ 	},
+ 	.n_linear_ranges = 1,
+-	.n_voltages = 216,
++	.n_voltages = 1721,
+ 	.pmic_mode_map = pmic_mode_map_pmic5_smps,
+ 	.of_map_mode = rpmh_regulator_pmic4_smps_of_map_mode,
+ };
+@@ -1123,10 +1123,10 @@ static const struct rpmh_vreg_hw_data pmic5_hfsmps515 = {
+ 	.regulator_type = VRM,
+ 	.ops = &rpmh_regulator_vrm_ops,
+ 	.voltage_ranges = (struct linear_range[]) {
+-		REGULATOR_LINEAR_RANGE(320000, 0, 235, 16000),
++		REGULATOR_LINEAR_RANGE(320000, 0, 3760, 1000),
+ 	},
+ 	.n_linear_ranges = 1,
+-	.n_voltages = 236,
++	.n_voltages = 3761,
+ 	.pmic_mode_map = pmic_mode_map_pmic5_smps,
+ 	.of_map_mode = rpmh_regulator_pmic4_smps_of_map_mode,
+ };
+-- 
+2.54.0
+
