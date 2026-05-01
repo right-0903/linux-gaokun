@@ -1,7 +1,7 @@
-From cf289a51b4ad61197afd1360e194b64c3d69b20b Mon Sep 17 00:00:00 2001
+From c2d79058e29db2394a172308a64e387cbf761264 Mon Sep 17 00:00:00 2001
 From: Pengyu Luo <mitltlatltl@gmail.com>
-Date: Sat, 25 Apr 2026 17:20:11 +0800
-Subject: [PATCH 1/4] media: hi846: fix hi846_write_reg_16 handling
+Date: Fri, 1 May 2026 16:37:22 +0800
+Subject: [PATCH v2 1/4] media: hi846: fix hi846_write_reg_16 handling
 
 hi846_write_reg_16() does not clear a positive *err value on success.
 pm_runtime_get_if_in_use() returns a positive value when the device
@@ -15,22 +15,24 @@ Fix this by resetting *err to 0 only when it is positive.
 Fixes: 04fc06f6dc15 ("media: hi846: fix usage of pm_runtime_get_if_in_use()")
 Signed-off-by: Pengyu Luo <mitltlatltl@gmail.com>
 ---
+remove `else` in v2
+---
  drivers/media/i2c/hi846.c | 2 ++
  1 file changed, 2 insertions(+)
 
 diff --git a/drivers/media/i2c/hi846.c b/drivers/media/i2c/hi846.c
-index a3f77b8434ca..09c109f3fba9 100644
+index a3f77b8434ca..7f069aca0fce 100644
 --- a/drivers/media/i2c/hi846.c
 +++ b/drivers/media/i2c/hi846.c
-@@ -1270,6 +1270,8 @@ static void hi846_write_reg_16(struct hi846 *hi846, u16 reg, u16 val, int *err)
- 
+@@ -1271,6 +1271,8 @@ static void hi846_write_reg_16(struct hi846 *hi846, u16 reg, u16 val, int *err)
  	if (*err < 0)
  		return;
-+	else
-+		*err = 0;
  
++	*err = 0;
++
  	put_unaligned_be16(reg, buf);
  	put_unaligned_be16(val, buf + 2);
+ 	ret = i2c_master_send(client, buf, sizeof(buf));
 -- 
 2.54.0
 

@@ -1,7 +1,7 @@
-From 4a10272aac260a788f934f5b62e7e68830e5d120 Mon Sep 17 00:00:00 2001
+From 059852441dda2fa9b1accea1fd6c110af3070526 Mon Sep 17 00:00:00 2001
 From: Pengyu Luo <mitltlatltl@gmail.com>
-Date: Sat, 25 Apr 2026 17:46:21 +0800
-Subject: [PATCH] media: hi846: Add 6MP and 8MP mode support
+Date: Fri, 1 May 2026 17:24:53 +0800
+Subject: [PATCH v2 3/4] media: hi846: Add 6MP and 8MP modes support
 
 Hi846 is an 8MP sensor, but the upstream driver has only supported 2MP
 mode for years. This patch adds 6MP and 8MP modes to maximize sensor
@@ -14,11 +14,13 @@ from the downstream Windows driver.
 
 Signed-off-by: Pengyu Luo <mitltlatltl@gmail.com>
 ---
- drivers/media/i2c/hi846.c | 154 +++++++++++++++++++++++++++++++++++++-
- 1 file changed, 153 insertions(+), 1 deletion(-)
+No changes in v2
+---
+ drivers/media/i2c/hi846.c | 152 +++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 151 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/media/i2c/hi846.c b/drivers/media/i2c/hi846.c
-index 09c109f3fba9..b8ae7344f1a0 100644
+index 3a0b1e124d9d..c786a54fc6f9 100644
 --- a/drivers/media/i2c/hi846.c
 +++ b/drivers/media/i2c/hi846.c
 @@ -1027,6 +1027,106 @@ static const struct hi846_reg mode_1632x1224_mipi_4lane[] = {
@@ -128,19 +130,7 @@ index 09c109f3fba9..b8ae7344f1a0 100644
  static const char * const hi846_test_pattern_menu[] = {
  	"Disabled",
  	"Solid Colour",
-@@ -1042,9 +1142,11 @@ static const char * const hi846_test_pattern_menu[] = {
- 
- #define FREQ_INDEX_640	0
- #define FREQ_INDEX_1280	1
-+#define FREQ_INDEX_3264	2
- static const s64 hi846_link_freqs[] = {
- 	[FREQ_INDEX_640] = 80000000,
- 	[FREQ_INDEX_1280] = 200000000,
-+	[FREQ_INDEX_3264] = 288000000,
- };
- 
- static const struct hi846_reg_list hi846_init_regs_list_2lane = {
-@@ -1134,7 +1236,57 @@ static const struct hi846_mode supported_modes[] = {
+@@ -1127,7 +1227,57 @@ static const struct hi846_mode supported_modes[] = {
  			.width = 1632 * 2,
  			.height = 1224 * 2,
  		},
@@ -149,7 +139,7 @@ index 09c109f3fba9..b8ae7344f1a0 100644
 +	{
 +		.width = 3264,
 +		.height = 1836,
-+		.link_freq_index = FREQ_INDEX_3264,
++		.pll_cfg_4lane = 0x4124, /* HI846_REG_PLL_CFG_MIPI2_H */
 +		.fps = 30,
 +		.frame_len = 2526,
 +		.llp = HI846_LINE_LENGTH,
@@ -174,7 +164,7 @@ index 09c109f3fba9..b8ae7344f1a0 100644
 +	{
 +		.width = 3264,
 +		.height = 2448,
-+		.link_freq_index = FREQ_INDEX_3264,
++		.pll_cfg_4lane = 0x4124, /* HI846_REG_PLL_CFG_MIPI2_H */
 +		.fps = 30,
 +		.frame_len = 2526,
 +		.llp = HI846_LINE_LENGTH,
