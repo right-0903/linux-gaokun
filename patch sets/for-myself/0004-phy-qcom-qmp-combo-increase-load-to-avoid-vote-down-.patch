@@ -1,0 +1,27 @@
+From c47b08e69b252f314ed146f3e361bab3b47f48d5 Mon Sep 17 00:00:00 2001
+From: Pengyu Luo <mitltlatltl@gmail.com>
+Date: Fri, 1 May 2026 01:00:25 +0800
+Subject: [PATCH] phy: qcom: qmp-combo: increase load to avoid vote down / lpm
+
+---
+ drivers/phy/qualcomm/phy-qcom-qmp-combo.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/phy/qualcomm/phy-qcom-qmp-combo.c b/drivers/phy/qualcomm/phy-qcom-qmp-combo.c
+index 93f1aa10d400..e30a78c07592 100644
+--- a/drivers/phy/qualcomm/phy-qcom-qmp-combo.c
++++ b/drivers/phy/qualcomm/phy-qcom-qmp-combo.c
+@@ -2060,8 +2060,8 @@ static const struct qmp_phy_init_tbl x1e80100_usb43dp_pcs_usb_tbl[] = {
+ 
+ /* list of regulators */
+ static struct regulator_bulk_data qmp_phy_vreg_l[] = {
+-	{ .supply = "vdda-phy", .init_load_uA = 21800, },
+-	{ .supply = "vdda-pll", .init_load_uA = 36000, },
++	{ .supply = "vdda-phy", .init_load_uA = 47000, },
++	{ .supply = "vdda-pll", .init_load_uA = 30000, },
+ };
+ 
+ static struct regulator_bulk_data qmp_phy_vreg_refgen[] = {
+-- 
+2.54.0
+
