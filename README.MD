@@ -49,7 +49,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | Bluetooth | works | Adding board file for wifi will improve RF performance |
 | Camera | works | No plan to support tuning data, no plan to improve rear sensor (I just scan the code :P) |
 | CPUfreq | works | |
-| Display | works |  |
+| Display | works | |
 | Display sensors | partial | for rotation detect, light detect, etc. see [slpi](#SLPI) |
 | EC | works | Battery and adapter status, wmi, ucsi, modern standby |
 | EFI variables | works | |
@@ -179,6 +179,9 @@ Rear sensor source [here](https://source.puri.sm/Librem5/linux/-/blob/pureos/lat
 
 ## Display
 Only core power sequence is taken into account (vddi, avdd/vsp, avee/vsn, bl), for the complete sequence, check [here](panel-hx83121a-dkms/dsi_pwr_seq.txt).
+
+### Color calibration
+Factory 3D lut `.cube` can be extracted by this [loader](https://github.com/right-0903/gaokun-color-mgmt). It can be loaded via [https://aur.archlinux.org/packages/vkbasalt] when gaming. To use it with DE, an cube to icc converter is required. (Someone with high performence AI subscription can try to generate it, PR is welcome.)
 
 **Addition: Some patches are first proposed by [matalama80td3l](https://github.com/matalama80td3l) at [here](https://gitlab.freedesktop.org/drm/msm/-/issues/56). I verified and completed them.**
 
