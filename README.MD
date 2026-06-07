@@ -71,7 +71,7 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 | TPM | x | |
 | USB | works | |
 | USB-PD | works | fast charging(45W+) supported with UCSI EC driver |
-| USB-C DisplayPort Alt Mode | works | it may be broken nowadays (untested since ~6.14) |
+| USB-C DisplayPort Alt Mode | works | it may be broken nowadays (PPM init issues) |
 | Video acceleration | partial | see [below](#Video-acceleration) |
 | Virtualisation | works | see [below](#Virtualisation)|
 | Volumn keys | works | |
@@ -85,8 +85,6 @@ Refer to [this](https://github.com/jhovold/linux/wiki/X13s) as well. If you want
 
 > [!CAUTION]
 > Recently, UCSI subsystem is buggy for this tablet. Chances are that failed to boot(auto reboot). Only plug into Type-C ports after booting up.
-
-Addition: UCSI failed to register in 6.14, no sure about future ~(I don't own this device anymore, no fix from me)~
 
 ~Support 2-lane only for now(only half of clocks are enabled), Johan mentioned [this](https://github.com/jhovold/linux/wiki/X13s#USB) also, but we don't require insert orientation.~
 
@@ -104,9 +102,9 @@ In default, the bandwidth of per lane is limited to 5.4Gbps(HBR2, DisplayPort 1.
 
 According to the [dcoument](https://learn.microsoft.com/en-us/windows/arm/dev-kit/#set-up-display---how-to-connect-monitors) of Windows Dev Kit 2023, USB-C ports support 8.1Gbps per lane(HBR3, DisplayPort 1.3 or later).
 
-In my case, the monitor supports DisplayPort 1.1 with 2.7Gbps per lane, data rate is 4.32Gbps(8b10b coding), basically, it means I can only use 1920x1080@60Hz. However, if we tweak the timings(at your risks), we can support a decent resolution with a rich timings, 24bpp with 2048(+180H.Blanking)x1280(+60V.Blanking)@60hz $\approx$ 4.30Gbps. If the bandwidth limit is exceeded, your bpp will be degraded to 18 (or lower?) to make actual bandwidth under the limit.
+~In my case, the monitor supports DisplayPort 1.1 with 2.7Gbps per lane, data rate is 4.32Gbps(8b10b coding), basically, it means I can only use 1920x1080@60Hz. However, if we tweak the timings(at your risks), we can support a decent resolution with a rich timings, 24bpp with 2048(+180H.Blanking)x1280(+60V.Blanking)@60hz $\approx$ 4.30Gbps. If the bandwidth limit is exceeded, your bpp will be degraded to 18 (or lower?) to make actual bandwidth under the limit.~ (__outdated__)
 
-If you encounter the following, reboot, it is rare, but still possible.
+If you encounter the following, reboot, it is rare, but still possible. (more frequent ~6.19)
 ```
 gaokun_ucsi.ucsi gaokun_ec.ucsi.0: error -ETIMEDOUT: PPM init failed
 gaokun_ucsi.ucsi gaokun_ec.ucsi.0: con1: failed to register alt modes
