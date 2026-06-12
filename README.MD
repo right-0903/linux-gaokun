@@ -118,7 +118,7 @@ If there is no issue now, let's plug in wait for seconds.
 
 ## Audio
 Recently, use the X13s' profile. \
-`sed -i 's/LENOVO.*ThinkPad X13s.*/LENOVO.*ThinkPad X13s.*|HUAWEI.*MateBook E.*\"/' /usr/share/alsa/ucm2/Qualcomm/sc8280xp/sc8280xp.conf`
+`ln -sf ../../Qualcomm/sc8280xp/LENOVO-X13s.conf /usr/share/alsa/ucm2/conf.d/sc8280xp/HUAWEI-GK_W7X-M1010-GK_W7X_PCB.conf`
 
 ## Backlight
 It is adjusted via DCS. ~It can also be adjusted via I2C, if we can figure out
