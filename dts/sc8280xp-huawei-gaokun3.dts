@@ -645,6 +645,8 @@
 };
 
 &spi6 {
+	qcom,force-gsi-mode;
+
 	pinctrl-0 = <&spi6_default>;
 	pinctrl-names = "default";
 
