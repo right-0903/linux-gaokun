@@ -1,0 +1,44 @@
+From: Lewis White <whitelewis@matebook-e-go>
+Date: Fri, 7 Feb 2026 02:08:18 +0700
+Subject: [PATCH 4/4] drm/msm/dpu: fix widebus data_width truncation in INTF
+
+When wide-bus mode is enabled, the INTF block computes data_width as:
+
+  data_width = p->width >> 1
+
+For an odd compressed width of 267 pixels (from DSC on a dual-DSI panel),
+this truncates to 133. Each pclk transfers 6 bytes in wide-bus mode, so:
+
+  133 * 6 = 798 bytes per line
+
+But DSC requires exactly 800 bytes per line (slice_width=800, 8bpp).
+The 2-byte shortfall causes a FIFO underflow and display failure.
+
+Use DIV_ROUND_UP(width, 2) instead of right-shift to round up to 134,
+giving 134 * 6 = 804 bytes, which satisfies the DSC requirement.
+
+Signed-off-by: Lewis White <whitelewis@matebook-e-go>
+---
+ drivers/gpu/drm/msm/disp/dpu1/dpu_hw_intf.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/msm/disp/dpu1/dpu_hw_intf.c b/drivers/gpu/drm/msm/disp/dpu1/dpu_hw_intf.c
+index abcdef1..1234567 100644
+--- a/drivers/gpu/drm/msm/disp/dpu1/dpu_hw_intf.c
++++ b/drivers/gpu/drm/msm/disp/dpu1/dpu_hw_intf.c
+@@ -173,9 +173,14 @@
+ 	 * since the data rate is doubled in this mode. But for the compression
+ 	 * mode in DP case, the p->width is already adjusted in
+ 	 * drm_mode_to_intf_timing_params()
++	 *
++	 * Use DIV_ROUND_UP to avoid truncating an odd width (e.g. 267 for
++	 * DSC compressed output), which would shorten the data window by
++	 * one pclk and cause a FIFO underflow (267>>1 = 133 pclks * 6 = 798
++	 * bytes, but DSC needs 800 bytes per line).
+ 	 */
+ 	if (p->wide_bus_en && !dp_intf)
+-		data_width = p->width >> 1;
++		data_width = DIV_ROUND_UP(p->width, 2);
+
+ 	/* TODO: handle DSC+DP case, we only handle DSC+DSI case so far */
+ 	if (p->compression_en && !dp_intf &&

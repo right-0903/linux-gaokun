@@ -1,0 +1,60 @@
+From: Lewis White <whitelewis@matebook-e-go>
+Date: Fri, 7 Feb 2026 01:53:26 +0700
+Subject: [PATCH 2/4] clk: qcom: dispcc-sc8280xp: remove CLK_SET_RATE_PARENT
+ from byte_div_clk_src dividers
+
+The four byte_div_clk_src dividers (disp{0,1}_cc_mdss_byte{0,1}_div_clk_src)
+had CLK_SET_RATE_PARENT set. When the DSI driver calls clk_set_rate() on
+byte_intf_clk, the rate-change propagates through the divider up to the
+parent PLL (byte_clk_src), halving the byte clock rate.
+
+On the Huawei MateBook E Go (sc8280xp) with its dual-DSI HX83121A panel,
+this causes the DSI link clock to be set incorrectly:
+  - Expected: byte_clk = 85.4 MHz (VCO 683.6 MHz / 8)
+  - Actual:   byte_clk = 42.7 MHz (PLL reconfigured by propagation)
+
+Remove CLK_SET_RATE_PARENT from all four byte divider clocks so that
+clk_set_rate() on the divider adjusts only the divider ratio, leaving the
+parent PLL untouched.
+
+Signed-off-by: Lewis White <whitelewis@matebook-e-go>
+---
+ drivers/clk/qcom/dispcc-sc8280xp.c | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/drivers/clk/qcom/dispcc-sc8280xp.c b/drivers/clk/qcom/dispcc-sc8280xp.c
+index abcdef1..1234567 100644
+--- a/drivers/clk/qcom/dispcc-sc8280xp.c
++++ b/drivers/clk/qcom/dispcc-sc8280xp.c
+@@ -1160,7 +1160,6 @@
+ 			&disp0_cc_mdss_byte0_clk_src.clkr.hw,
+ 		},
+ 		.num_parents = 1,
+-		.flags = CLK_SET_RATE_PARENT,
+ 		.ops = &clk_regmap_div_ops,
+ 	},
+ };
+@@ -1175,7 +1174,6 @@
+ 			&disp1_cc_mdss_byte0_clk_src.clkr.hw,
+ 		},
+ 		.num_parents = 1,
+-		.flags = CLK_SET_RATE_PARENT,
+ 		.ops = &clk_regmap_div_ops,
+ 	},
+ };
+@@ -1190,7 +1188,6 @@
+ 			&disp0_cc_mdss_byte1_clk_src.clkr.hw,
+ 		},
+ 		.num_parents = 1,
+-		.flags = CLK_SET_RATE_PARENT,
+ 		.ops = &clk_regmap_div_ops,
+ 	},
+ };
+@@ -1205,7 +1202,6 @@
+ 			&disp1_cc_mdss_byte1_clk_src.clkr.hw,
+ 		},
+ 		.num_parents = 1,
+-		.flags = CLK_SET_RATE_PARENT,
+ 		.ops = &clk_regmap_div_ops,
+ 	},
+ };

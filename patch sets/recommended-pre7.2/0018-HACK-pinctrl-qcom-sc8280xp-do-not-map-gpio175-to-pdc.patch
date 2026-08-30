@@ -1,0 +1,34 @@
+From ae26e6b92b51a84f2f3889c27580ac3403006e92 Mon Sep 17 00:00:00 2001
+From: Pengyu Luo <mitltlatltl@gmail.com>
+Date: Tue, 21 Apr 2026 00:13:10 +0800
+Subject: [PATCH] HACK: pinctrl: qcom: sc8280xp: do not map touchscreen's IRQ to PDC
+
+It seems that too many wakeup IRQs are unmasked, trying to disable
+the wakeup IRQ of swr2 or EC, freeze or lag is no longer seen on
+the touchscreen.
+
+Since the touchscreen lacks wakeup capability (disabeld when screen
+is off), so do not map its IRQ to PDC. This will fix impact from new
+added EC wakeup IRQ.
+
+Signed-off-by: Pengyu Luo <mitltlatltl@gmail.com>
+---
+ drivers/pinctrl/qcom/pinctrl-sc8280xp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/qcom/pinctrl-sc8280xp.c b/drivers/pinctrl/qcom/pinctrl-sc8280xp.c
+index cf8297e8b8f8..6d2e2f7d9c20 100644
+--- a/drivers/pinctrl/qcom/pinctrl-sc8280xp.c
++++ b/drivers/pinctrl/qcom/pinctrl-sc8280xp.c
+@@ -1887,7 +1887,7 @@ static const struct msm_gpio_wakeirq_map sc8280xp_pdc_map[] = {
+ 	{ 144, 229 }, { 145, 230 }, { 146, 231 }, { 148, 232 },
+ 	{ 149, 233 }, { 150, 234 }, { 152, 235 }, { 154, 212 },
+ 	{ 157, 213 }, { 161, 219 }, { 170, 236 }, { 171, 221 },
+-	{ 174, 222 }, { 175, 237 }, { 176, 223 }, { 177, 170 },
++	{ 174, 222 }, { 176, 223 }, { 177, 170 },
+ 	{ 180, 238 }, { 181, 239 }, { 182, 240 }, { 183, 241 },
+ 	{ 184, 242 }, { 185, 243 }, { 190, 178 }, { 193, 184 },
+ 	{ 196, 185 }, { 198, 186 }, { 200, 174 }, { 201, 175 },
+-- 
+2.53.0
+

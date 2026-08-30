@@ -1,0 +1,36 @@
+From: Lewis <lewis@matebook-e-go-linux>
+Date: Sun, 9 Feb 2026 00:00:00 +0800
+Subject: [PATCH] platform/arm64: huawei-gaokun-ec: fix suspend/resume ordering
+
+Use SYSTEM_SLEEP_PM_OPS instead of NOIRQ_SYSTEM_SLEEP_PM_OPS for the
+gaokun EC driver's power management callbacks.
+
+The NOIRQ variant runs after IRQs are disabled and I2C bus controllers
+have been suspended, making EC communication impossible. This causes
+resume to fail silently since the EC suspend handshake never completes.
+
+Switching to SYSTEM_SLEEP_PM_OPS runs the callbacks while the I2C bus
+is still operational.
+
+Signed-off-by: Lewis <lewis@matebook-e-go-linux>
+---
+---
+ drivers/platform/arm64/huawei-gaokun-ec.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/platform/arm64/huawei-gaokun-ec.c b/drivers/platform/arm64/huawei-gaokun-ec.c
+index 7170f8eb7..a3f23f2bd 100644
+--- a/drivers/platform/arm64/huawei-gaokun-ec.c
++++ b/drivers/platform/arm64/huawei-gaokun-ec.c
+@@ -807,7 +807,7 @@ static const struct of_device_id gaokun_ec_of_match[] = {
+ MODULE_DEVICE_TABLE(of, gaokun_ec_of_match);
+ 
+ static const struct dev_pm_ops gaokun_ec_pm_ops = {
+-	NOIRQ_SYSTEM_SLEEP_PM_OPS(gaokun_ec_suspend, gaokun_ec_resume)
++	SYSTEM_SLEEP_PM_OPS(gaokun_ec_suspend, gaokun_ec_resume)
+ };
+ 
+ static struct i2c_driver gaokun_ec_driver = {
+-- 
+2.53.0
+

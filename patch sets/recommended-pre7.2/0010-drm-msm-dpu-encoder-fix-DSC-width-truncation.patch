@@ -1,0 +1,48 @@
+From: Lewis White <whitelewis@matebook-e-go>
+Date: Fri, 7 Feb 2026 01:59:26 +0700
+Subject: [PATCH 3/4] drm/msm/dpu: fix DSC compressed width truncation in
+ encoder
+
+The DPU video-mode encoder computes the compressed width for DSC using
+integer division:
+
+  width = width * bpp / (bpc * 3)
+
+For a 1600-pixel-wide dual-DSI panel with 8 bpp DSC and 8 bpc, the
+per-link calculation is:
+
+  800 * 8 / 24 = 266  (truncated from 266.67)
+
+However, the DSI host (dsi_timing_setup) uses DIV_ROUND_UP and gets 267.
+This 1-pixel mismatch between the DPU encoder (266) and DSI host (267)
+causes the display to fail to light up.
+
+Use DIV_ROUND_UP to match the DSI host's calculation, ensuring both
+sides agree on the compressed line width.
+
+Signed-off-by: Lewis White <whitelewis@matebook-e-go>
+---
+ drivers/gpu/drm/msm/disp/dpu1/dpu_encoder_phys_vid.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/msm/disp/dpu1/dpu_encoder_phys_vid.c b/drivers/gpu/drm/msm/disp/dpu1/dpu_encoder_phys_vid.c
+index abcdef1..1234567 100644
+--- a/drivers/gpu/drm/msm/disp/dpu1/dpu_encoder_phys_vid.c
++++ b/drivers/gpu/drm/msm/disp/dpu1/dpu_encoder_phys_vid.c
+@@ -130,11 +130,12 @@
+ 		struct drm_dsc_config *dsc =
+ 		       dpu_encoder_get_dsc_config(phys_enc->parent);
+ 		/*
+-		 * TODO: replace drm_dsc_get_bpp_int with logic to handle
+-		 * fractional part if there is fraction
++		 * Compute the number of pclk cycles needed to transfer one
++		 * line of compressed data. Use DIV_ROUND_UP to match the
++		 * DSI host's timing calculation in dsi_timing_setup().
+ 		 */
+-		timing->width = timing->width * drm_dsc_get_bpp_int(dsc) /
+-				(dsc->bits_per_component * 3);
++		timing->width = DIV_ROUND_UP(timing->width * drm_dsc_get_bpp_int(dsc),
++					     dsc->bits_per_component * 3);
+ 		timing->xres = timing->width;
+ 	}
+ }

@@ -1,0 +1,76 @@
+From 0f5c49321d78c11d7c02e3263e18eaf81cd70106 Mon Sep 17 00:00:00 2001
+From: Pengyu Luo <mitltlatltl@gmail.com>
+Date: Mon, 27 Apr 2026 17:42:55 +0800
+Subject: [PATCH] arm64: dts: qcom: sc8208xp: move dsi1_phy before dsi1
+
+This trick lets dis1_phy probe before dsi, which will fix complain,
+though the error is harmless.
+
+msm_dsi ae96000.dsi: [drm:dsi_dev_probe [msm]] *ERROR* dsi_get_phy: phy driver is not ready
+
+Signed-off-by: Pengyu Luo <mitltlatltl@gmail.com>
+---
+ arch/arm64/boot/dts/qcom/sc8280xp.dtsi | 40 +++++++++++++-------------
+ 1 file changed, 20 insertions(+), 20 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/sc8280xp.dtsi b/arch/arm64/boot/dts/qcom/sc8280xp.dtsi
+index 761f229e8f47..ff4e0b1e845d 100644
+--- a/arch/arm64/boot/dts/qcom/sc8280xp.dtsi
++++ b/arch/arm64/boot/dts/qcom/sc8280xp.dtsi
+@@ -4913,6 +4913,26 @@ mdss0_dsi0_phy: phy@ae94400 {
+ 				status = "disabled";
+ 			};
+ 
++			mdss0_dsi1_phy: phy@ae96400 {
++				compatible = "qcom,sc8280xp-dsi-phy-5nm",
++					     "qcom,sa8775p-dsi-phy-5nm";
++				reg = <0 0x0ae96400 0 0x200>,
++				      <0 0x0ae96600 0 0x280>,
++				      <0 0x0ae96900 0 0x280>;
++				reg-names = "dsi_phy",
++					    "dsi_phy_lane",
++					    "dsi_pll";
++
++				#clock-cells = <1>;
++				#phy-cells = <0>;
++
++				clocks = <&dispcc0 DISP_CC_MDSS_AHB_CLK>,
++					 <&rpmhcc RPMH_CXO_CLK>;
++				clock-names = "iface", "ref";
++
++				status = "disabled";
++			};
++
+ 			mdss0_dsi1: dsi@ae96000 {
+ 				compatible = "qcom,sc8280xp-dsi-ctrl",
+ 					     "qcom,sa8775p-dsi-ctrl",
+@@ -4975,26 +4995,6 @@ mdss0_dsi1_out: endpoint {
+ 				};
+ 			};
+ 
+-			mdss0_dsi1_phy: phy@ae96400 {
+-				compatible = "qcom,sc8280xp-dsi-phy-5nm",
+-					     "qcom,sa8775p-dsi-phy-5nm";
+-				reg = <0 0x0ae96400 0 0x200>,
+-				      <0 0x0ae96600 0 0x280>,
+-				      <0 0x0ae96900 0 0x280>;
+-				reg-names = "dsi_phy",
+-					    "dsi_phy_lane",
+-					    "dsi_pll";
+-
+-				#clock-cells = <1>;
+-				#phy-cells = <0>;
+-
+-				clocks = <&dispcc0 DISP_CC_MDSS_AHB_CLK>,
+-					 <&rpmhcc RPMH_CXO_CLK>;
+-				clock-names = "iface", "ref";
+-
+-				status = "disabled";
+-			};
+-
+ 			mdss0_dp1: displayport-controller@ae98000 {
+ 				compatible = "qcom,sc8280xp-dp";
+ 				reg = <0 0xae98000 0 0x200>,
+-- 
+2.54.0
+
