@@ -29,7 +29,7 @@ diff --git a/drivers/gpu/drm/msm/disp/dpu1/dpu_encoder_phys_vid.c b/drivers/gpu/
 index abcdef1..1234567 100644
 --- a/drivers/gpu/drm/msm/disp/dpu1/dpu_encoder_phys_vid.c
 +++ b/drivers/gpu/drm/msm/disp/dpu1/dpu_encoder_phys_vid.c
-@@ -130,11 +130,12 @@
+@@ -130,12 +130,13 @@
  		struct drm_dsc_config *dsc =
  		       dpu_encoder_get_dsc_config(phys_enc->parent);
  		/*
@@ -44,5 +44,6 @@ index abcdef1..1234567 100644
 +		timing->width = DIV_ROUND_UP(timing->width * drm_dsc_get_bpp_int(dsc),
 +					     dsc->bits_per_component * 3);
  		timing->xres = timing->width;
+ 		timing->dce_bytes_per_line = msm_dsc_get_bytes_per_line(dsc);
  	}
  }

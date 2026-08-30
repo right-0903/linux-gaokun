@@ -35,7 +35,7 @@ index ee02acd18856..8d526ffede36 100644
 +		};
 +
 +		adsp_rpc_remote_heap_mem: adsp-rpc-remote-heap@84a00000 {
-+			reg = <0x0 0x84a00000 0x0 0x800000>;
++			reg = <0 0x84a00000 0 0x800000>;
  			no-map;
  		};
  
