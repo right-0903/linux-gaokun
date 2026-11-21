@@ -1295,7 +1295,7 @@
 };
 
 &usb_0_hsphy {
-	vdda-pll-supply = <&vreg_l6d>;
+	vdda-pll-supply = <&vreg_l9d>;
 	vdda18-supply = <&vreg_l1c>;
 	vdda33-supply = <&vreg_l7d>;
 
