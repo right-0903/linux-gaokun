@@ -575,9 +575,6 @@
 			regulator-min-microvolt = <912000>;
 			regulator-max-microvolt = <912000>;
 			regulator-initial-mode = <RPMH_REGULATOR_MODE_HPM>;
-			regulator-allow-set-load;
-			regulator-allowed-modes = <RPMH_REGULATOR_MODE_LPM
-						   RPMH_REGULATOR_MODE_HPM>;
 		};
 
 		vreg_l9d: ldo9 {
@@ -1302,9 +1299,10 @@
 	status = "okay";
 };
 
+// on seq: phy pll refgen(missing), 912, 1200, 880
 &usb_0_qmpphy {
-	vdda-phy-supply = <&vreg_l4d>;
-	vdda-pll-supply = <&vreg_l9d>;
+	vdda-phy-supply = <&vreg_l9d>;
+	vdda-pll-supply = <&vreg_l4d>;
 
 	mode-switch;
 	orientation-switch;
@@ -1333,7 +1331,7 @@
 };
 
 &usb_1_hsphy {
-	vdda-pll-supply = <&vreg_l6b>;
+	vdda-pll-supply = <&vreg_l4b>;
 	vdda18-supply = <&vreg_l1c>;
 	vdda33-supply = <&vreg_l13c>;
 
@@ -1362,32 +1360,15 @@
 	status = "okay";
 };
 
-&usb_2_hsphy0 {
-	vdda-pll-supply = <&vreg_l6d>;
-	vdda18-supply = <&vreg_l1c>;
-	vdda33-supply = <&vreg_l7d>;
-
-	status = "okay";
-};
-
-&usb_2_hsphy1 {
-	vdda-pll-supply = <&vreg_l6d>;
-	vdda18-supply = <&vreg_l1c>;
-	vdda33-supply = <&vreg_l7d>;
-
-	status = "okay";
+&usb_2_dwc3 {
+	phys = <&usb_2_hsphy2>, <&usb_2_qmpphy0>;
+	phy-names = "usb2-phy", "usb3-phy";
+	maximum-speed = "high-speed";
+	snps,usb2-lpm-disable;
 };
 
 &usb_2_hsphy2 {
-	vdda-pll-supply = <&vreg_l6d>;
-	vdda18-supply = <&vreg_l8c>;
-	vdda33-supply = <&vreg_l2d>;
-
-	status = "okay";
-};
-
-&usb_2_hsphy3 {
-	vdda-pll-supply = <&vreg_l6d>;
+	vdda-pll-supply = <&vreg_l10d>;
 	vdda18-supply = <&vreg_l8c>;
 	vdda33-supply = <&vreg_l2d>;
 
@@ -1397,13 +1378,6 @@
 &usb_2_qmpphy0 {
 	vdda-phy-supply = <&vreg_l4d>;
 	vdda-pll-supply = <&vreg_l1b>;
-
-	status = "okay";
-};
-
-&usb_2_qmpphy1 {
-	vdda-phy-supply = <&vreg_l4d>;
-	vdda-pll-supply = <&vreg_l8d>;
 
 	status = "okay";
 };
